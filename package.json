@@ -1,0 +1,32 @@
+{
+  "name": "erosify-server",
+  "version": "0.1.3",
+  "description": "Erosify RESTful server written in Node.js",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "JSONStream": "~0.7.2",
+    "bcrypt-nodejs": "0.0.3",
+    "body-parser": "~1.0.1",
+    "express": "~4.13.x",
+    "express-cors-options": "0.0.4",
+    "pg": "~4.4.0",
+    "pg-query-stream": "~0.4.2",
+    "underscore": "~1.6.0"
+  },
+  "engines": {
+    "node": "0.12.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@heroku.com:erosify-server.git"
+  },
+  "keywords": [
+    "node",
+    "heroku",
+    "express"
+  ],
+  "license": "MIT"
+}
