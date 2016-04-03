@@ -122,10 +122,25 @@ pg.connect(config.dbURL, function(err, client, done) {
         });
     });
 
+    router.post('/me', function (req, res) {
+        var start = new Date();
+        //later we'll use the user's token instead of email
+        var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+        client.query(query, function (err, result) {
+            console.log('Query done in ' + (new Date() - start ) + 'ms');
+            if (err) {
+                res.status(500).json({ success: false, error: err });
+            }
+            else {
+                res.status(200).json({ success: true, data: result.rows[0] });
+            }
+        });
+    });
+
     // register our router
     app.use('/api/v1/', router);
 
     // start the server
     app.listen(process.env.PORT || config.HTTPServerPort);
-    console.log('RESTful server started on port ' + config.HTTPServerPort);
+    console.log('RESTful API server started on port ' + config.HTTPServerPort);
 });
