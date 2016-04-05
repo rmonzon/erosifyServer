@@ -1,8 +1,8 @@
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
-var Result = require(__dirname + '/result');
-var utils = require(__dirname + '/utils');
+var Result = require('./result');
+var utils = require('./utils');
 
 var Query = function(config, values, callback) {
   // use of "new" optional
@@ -68,6 +68,15 @@ Query.prototype.handleCommandComplete = function(msg, con) {
   this._result.addCommandComplete(msg);
   //need to sync after each command complete of a prepared statement
   if(this.isPreparedStatement) {
+    con.sync();
+  }
+};
+
+//if a named prepared statement is created with empty query text
+//the backend will send an emptyQuery message but *not* a command complete message
+//execution on the connection will hang until the backend receives a sync message
+Query.prototype.handleEmptyQuery = function(con) {
+  if (this.isPreparedStatement) {
     con.sync();
   }
 };

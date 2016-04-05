@@ -3,13 +3,16 @@ var fs = require('fs');
 var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
-var cors = require('express-cors-options');
+//var cors = require('express-cors-options');
+var cors = require('cors');
 var pg = require('pg');
 var _ = require('underscore');
 var bcrypt = require('bcrypt-nodejs');
+var crypto = require('crypto');
 
 // read the config
 var config = {};
+var client_token = "";
 
 console.log(path.basename(__filename, path.extname(__filename)));
 var configfile = './' + path.basename(__filename, path.extname(__filename)) + '.json';
@@ -53,7 +56,7 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.use(function (req, res, next) {
         // do logging
         console.log('Request received by router.');
-        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.header("Access-Control-Allow-Origin", "*");
 
         next(); // make sure we go to the next routes and don't stop here
     });
@@ -83,7 +86,17 @@ pg.connect(config.dbURL, function(err, client, done) {
         console.log(req.body);
         var start = new Date();
         var passwordEnc = bcrypt.hashSync(req.body.password);
-        var query = "INSERT INTO profile (name, lastname, email, password, dob, gender) VALUES ('" + req.body.name + "', '" + req.body.lastname + "', '" + req.body.email + "', '" + passwordEnc + "', '" + req.body.dob + "', '" + req.body.gender + "');";
+        var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, pictures, age, location, status) VALUES (" +
+            "'" + req.body.name + "', " +
+            "'" + req.body.lastname + "', " +
+            "'" + req.body.email + "', " +
+            "'" + passwordEnc + "', " +
+            "'" + req.body.dob + "', " +
+            "'" + req.body.gender + "', " +
+            "" + req.body.pictures + ", " +
+            "" + req.body.age + ", " +
+            "'" + req.body.location + "', " +
+            "" + 1 + ");";
         client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms');
             if (err) {
@@ -98,7 +111,7 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/authentication', function(req, res) {
         var start = new Date();
-        var query = "SELECT password FROM profile WHERE email='" + req.body.email + "';";
+        var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
         client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms');
             if (err) {
@@ -107,8 +120,10 @@ pg.connect(config.dbURL, function(err, client, done) {
             else {
                 if (result.rows[0]) {
                     if (bcrypt.compareSync(req.body.password, result.rows[0].password)) {
-                        console.log("passwords matched!!!");
-                        res.status(200).json({ success: true, info: "Authentication succeed!" });
+                        crypto.randomBytes(48, function(err, buffer) {
+                            client_token = buffer.toString('hex');
+                            res.status(200).json({ success: true, token: client_token, user: result.rows[0], info: "Authentication succeed!" });
+                        });
                     }
                     else {
                         console.log(result.rows[0].password);
@@ -123,16 +138,49 @@ pg.connect(config.dbURL, function(err, client, done) {
     });
 
     router.post('/me', function (req, res) {
+        if (req.headers.token && req.headers.token === client_token) {
+            var start = new Date();
+            var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+            client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({ success: true, data: result.rows[0] });
+                }
+            });
+        }
+        else {
+            res.status(401).json({ success: false, error: "Wrong or expired token!" });
+        }
+    });
+
+    router.post('/logout', function (req, res) {
+        client_token = "";
         var start = new Date();
-        //later we'll use the user's token instead of email
-        var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+        var query = "UPDATE profile SET status=0 WHERE email='" + req.body.email + "';";
         client.query(query, function (err, result) {
-            console.log('Query done in ' + (new Date() - start ) + 'ms');
+            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
                 res.status(500).json({ success: false, error: err });
             }
             else {
-                res.status(200).json({ success: true, data: result.rows[0] });
+                res.status(200).json({ success: true, info: "Logged out successfully!" });
+            }
+        });
+    });
+
+    router.post('/check_email', function (req, res) {
+        var start = new Date();
+        var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+        client.query(query, function (err, result) {
+            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+            if (err) {
+                res.status(500).json({ success: false, error: err });
+            }
+            else {
+                res.status(200).json({ success: true, existEmail: result.rows.length > 0 });
             }
         });
     });

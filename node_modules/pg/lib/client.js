@@ -4,10 +4,10 @@ var util = require('util');
 var pgPass = require('pgpass');
 var TypeOverrides = require('./type-overrides');
 
-var ConnectionParameters = require(__dirname + '/connection-parameters');
-var Query = require(__dirname + '/query');
-var defaults = require(__dirname + '/defaults');
-var Connection = require(__dirname + '/connection');
+var ConnectionParameters = require('./connection-parameters');
+var Query = require('./query');
+var defaults = require('./defaults');
+var Connection = require('./connection');
 
 var Client = function(config) {
   EventEmitter.call(this);
@@ -111,6 +111,11 @@ Client.prototype.connect = function(callback) {
     //delegate portalSuspended to active query
     con.on('portalSuspended', function(msg) {
       self.activeQuery.handlePortalSuspended(con);
+    });
+
+    //deletagate emptyQuery to active query
+    con.on('emptyQuery', function(msg) {
+      self.activeQuery.handleEmptyQuery(con);
     });
 
     //delegate commandComplete to active query
