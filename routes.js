@@ -1,6 +1,7 @@
 var bcrypt = require('bcrypt-nodejs');
 var crypto = require('crypto');
 var main = require('./index');
+var fs = require('fs');
 
 var client_token = "";
 
@@ -33,24 +34,22 @@ exports.authentication = function (req, res) {
 };
 
 exports.create_account = function(req, res) {
-    console.log(req.body);
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, pictures, age, location, status) VALUES (" +
+    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.lastname + "', " +
         "'" + req.body.email + "', " +
         "'" + passwordEnc + "', " +
         "'" + req.body.dob + "', " +
         "'" + req.body.gender + "', " +
-        "" + req.body.pictures + ", " +
         "" + req.body.age + ", " +
         "'" + req.body.location + "', " +
         "" + 1 + ");";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
-            res.status(500).json({ success: false, error: err});
+            res.status(200).json({ success: false, error: err});
             //res.json({message: errmsg});
         }
         else {
@@ -107,13 +106,23 @@ exports.check_email = function (req, res) {
     });
 };
 
-exports.photosByUserId = function (req, res) {
-    // res.sendFile(fileName, { root: __dirname }, function (err) {
-    //     if (err) {
-    //         res.status(err.status).json({ success: false, error: err });
-    //     }
-    //     else {
-    //         console.log('File sent: ', fileName);
-    //     }
-    // });
+exports.uploadPictures = function (req, res) {
+    fs.readFile(req.file.path, function (err, data) {
+        var imageName = req.file.originalname;
+        // If there's an error
+        if (!imageName) {
+            console.log("There was an error");
+            res.status(500).json({success: false, error: err});
+        } else {
+            var newPath = __dirname + "/images/profiles/user_7/" + imageName;
+            fs.writeFile(newPath, data, function (err) {
+                if (err) {
+                    res.status(200).json({success: true, data: "Image uploaded successfully!"});
+                }
+                else {
+                    res.status(200).json({success: true, data: "Image uploaded successfully!"});
+                }
+            });
+        }
+    });
 };

@@ -8,6 +8,8 @@ var pg = require('pg');
 var _ = require('underscore');
 var http = require('http');
 var routes = require('./routes');
+var multer  = require('multer');
+var upload = multer({ dest: 'images/profiles/' });
 
 // read the config
 var config = {};
@@ -29,6 +31,8 @@ catch(err) {
     console.log(err);
     console.log('Usage: node ' + path.basename(__filename, path.extname(__filename)));
 }
+
+app.use(express.static('images'));
 
 // connect to the database and use a pool
 console.log("Connecting to database: " + config.dbURL.database);
@@ -71,7 +75,13 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/check_email', routes.check_email);
 
-    router.get('/photos/user/:uid', routes.photosByUserId);
+
+
+
+
+    router.post('/upload', upload.single('avatar'), routes.uploadPictures);
+
+    router.post('/photos/user/upload/:uid', upload.array('photos', 12), routes.uploadPictures);
 
     // register our router
     app.use('/api/v1/', router);
