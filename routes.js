@@ -36,7 +36,7 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status) VALUES (" +
+    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.lastname + "', " +
         "'" + req.body.email + "', " +
@@ -45,7 +45,9 @@ exports.create_account = function(req, res) {
         "'" + req.body.gender + "', " +
         "" + req.body.age + ", " +
         "'" + req.body.location + "', " +
-        "" + 1 + ");";
+        "" + 1 + ", " +
+        "" + req.body.pictures + ", " +
+        "" + 0 + ");";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
@@ -53,7 +55,25 @@ exports.create_account = function(req, res) {
             //res.json({message: errmsg});
         }
         else {
-            res.status(200).json(result);
+            start = new Date();
+            var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    crypto.randomBytes(48, function (err, buffer) {
+                        client_token = buffer.toString('hex');
+                        res.status(200).json({
+                            success: true,
+                            token: client_token,
+                            user: result.rows[0],
+                            info: "Registration succeed!"
+                        });
+                    });
+                }
+            });
         }
     });
 };
@@ -102,6 +122,20 @@ exports.check_email = function (req, res) {
         }
         else {
             res.status(200).json({ success: true, existEmail: result.rows.length > 0 });
+        }
+    });
+};
+
+exports.matches = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile WHERE email<>'" + req.body.email + "';";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, matches: result.rows });
         }
     });
 };

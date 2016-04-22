@@ -75,6 +75,7 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/check_email', routes.check_email);
 
+    router.post('/matches', routes.matches);
 
 
 
