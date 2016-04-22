@@ -1,4 +1,4 @@
-# node-js-getting-started
+# Node.js and Express.js RESTful server 
 
 A barebones Node.js app using [Express 4](http://expressjs.com/).
 
