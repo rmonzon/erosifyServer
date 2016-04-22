@@ -2,6 +2,7 @@ var bcrypt = require('bcrypt-nodejs');
 var crypto = require('crypto');
 var main = require('./index');
 var fs = require('fs');
+var helpers = require('./helpers');
 
 var client_token = "";
 
@@ -136,6 +137,48 @@ exports.matches = function (req, res) {
         }
         else {
             res.status(200).json({ success: true, matches: result.rows });
+        }
+    });
+};
+
+exports.makeFavorite = function (req, res) {
+    var start = new Date();
+    var query = "INSERT INTO favorites (profile_id, date) VALUES (" + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            start = new Date();
+            var query = "INSERT INTO profile_fav (profile_id, favorite_id) VALUES (" + req.body.my_id + ", " + result.rows[0].id + ");";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({
+                        success: true,
+                        info: "Favorite added successfully!"
+                    });
+                }
+            });
+        }
+    });
+};
+
+exports.getMyFavorites = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile_fav INNER JOIN favorites ON profile_fav.favorite_id = favorites.id INNER JOIN profile ON " +
+        "profile.id = favorites.profile_id WHERE profile_fav.profile_id = " + req.body.profile_id + ";";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, favorites: result.rows });
         }
     });
 };
