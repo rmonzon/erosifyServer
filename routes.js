@@ -82,7 +82,7 @@ exports.create_account = function(req, res) {
 exports.me = function (req, res) {
     if (req.headers.token && req.headers.token === client_token) {
         var start = new Date();
-        var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "';SELECT * FROM profile WHERE email='" + req.body.email + "';";
         main.client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
@@ -183,6 +183,90 @@ exports.getMyFavorites = function (req, res) {
     });
 };
 
+exports.doLikeOrDislike = function (req, res) {
+    var start = new Date();
+    var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateFormatted(start) + "'";
+    var upsert = "UPDATE relationships SET liked = " + req.body.liked + " WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
+    var query = "WITH upsert AS (" + upsert + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            start = new Date();
+            var query = "SELECT * FROM relationships WHERE user_one_id = " + req.body.other_id + " AND user_two_id = " + req.body.my_id + " AND liked = 1;";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    if (result.rows.length > 0) {
+                        //add a new match
+                        createMatch(start, req.body.my_id, req.body.other_id, res);
+                    }
+                    else {
+                        res.status(200).json({ success: true, isMatch: result.rows.length > 0 });
+                    }
+                }
+            });
+        }
+    });
+};
+
+exports.getMyMatches = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile_matches INNER JOIN matches ON profile_matches.match_id = matches.id INNER JOIN profile ON " +
+        "profile.id = matches.profile_id WHERE profile_matches.profile_id = " + req.body.my_id + ";";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, matches: result.rows });
+        }
+    });
+};
+
+exports.getMyLikes = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile INNER JOIN relationships ON profile.id = relationships.user_one_id WHERE relationships.user_two_id = " + req.body.my_id + " AND liked = 1";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, likes: result.rows });
+        }
+    });
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 exports.uploadPictures = function (req, res) {
     fs.readFile(req.file.path, function (err, data) {
         var imageName = req.file.originalname;
@@ -203,3 +287,45 @@ exports.uploadPictures = function (req, res) {
         }
     });
 };
+
+function createMatch(start, my_id, other_id, res) {
+    var query = "INSERT INTO matches (profile_id, date) VALUES (" + other_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({success: false, error: err});
+        }
+        else {
+            start = new Date();
+            query = "INSERT INTO profile_matches (profile_id, match_id) VALUES (" + my_id + ", " + result.rows[0].id + ");";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms');
+                if (err) {
+                    res.status(500).json({success: false, error: err});
+                }
+                else {
+                    query = "INSERT INTO matches (profile_id, date) VALUES (" + my_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
+                    main.client.query(query, function (err, result) {
+                        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                        if (err) {
+                            res.status(500).json({success: false, error: err});
+                        }
+                        else {
+                            start = new Date();
+                            var query = "INSERT INTO profile_matches (profile_id, match_id) VALUES (" + other_id + ", " + result.rows[0].id + ");";
+                            main.client.query(query, function (err, result) {
+                                console.log('Query done in ' + (new Date() - start ) + 'ms');
+                                if (err) {
+                                    res.status(500).json({success: false, error: err});
+                                }
+                                else {
+                                    res.status(200).json({success: true, isMatch: true});
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    });
+}

@@ -81,6 +81,16 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/favorites', routes.getMyFavorites);
 
+    router.post('/like', routes.doLikeOrDislike);
+
+    router.post('/wholikedme', routes.getMyLikes);
+
+    router.post('/mymatches', routes.getMyMatches);
+    
+    
+    
+    
+
 
     router.post('/upload', upload.single('avatar'), routes.uploadPictures);
 
