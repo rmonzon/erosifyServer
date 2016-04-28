@@ -129,7 +129,22 @@ exports.check_email = function (req, res) {
 
 exports.matches = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM profile WHERE email<>'" + req.body.email + "';";
+    var query = "SELECT " +
+        "profile.id, " +
+        "profile.name, " +
+        "profile.email, " +
+        "profile.age, " +
+        "profile.gender, " +
+        "profile.aboutme, " +
+        "profile.work, " +
+        "profile.education, " +
+        "profile.location, " +
+        "profile.status, " +
+        "profile.pictures, " +
+        "profile.verified, " +
+        "profile.languages " +
+        "FROM profile WHERE profile.id NOT IN (SELECT user_two_id FROM relationships WHERE user_one_id = " + req.body.id + ") AND id<>'" + req.body.id + "' ORDER BY profile.id;";
+
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -244,7 +259,38 @@ exports.getMyLikes = function (req, res) {
     });
 };
 
-
+exports.getUserInfo = function (req, res) {
+    //if (req.headers.token && req.headers.token === client_token) {
+        var start = new Date();
+        var query = "SELECT * FROM profile WHERE id = " + req.params.id + ";";
+        main.client.query(query, function (err, result) {
+            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+            if (err) {
+                res.status(500).json({ success: false, error: err });
+            }
+            else {
+                var userObj = result.rows[0];
+                start = new Date();
+                var query = "SELECT liked FROM relationships WHERE user_one_id = " + req.headers.my_id + " AND user_two_id = " + req.params.id + ";";
+                main.client.query(query, function (err, result) {
+                    console.log('Query done in ' + (new Date() - start ) + 'ms');
+                    if (err) {
+                        res.status(500).json({success: false, error: err});
+                    }
+                    else {
+                        if (result.rows.length > 0) {
+                            userObj.liked = result.rows[0].liked;
+                        }
+                        res.status(200).json({success: true, data: userObj});
+                    }
+                });
+            }
+        });
+    // }
+    // else {
+    //     res.status(401).json({ success: false, error: "Wrong or expired token!" });
+    // }
+};
 
 
 

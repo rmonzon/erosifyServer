@@ -86,6 +86,8 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/wholikedme', routes.getMyLikes);
 
     router.post('/mymatches', routes.getMyMatches);
+
+    router.get('/user/:id', routes.getUserInfo);
     
     
     
