@@ -77,7 +77,9 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/matches', routes.matches);
 
-    router.post('/favorite', routes.makeFavorite);
+    router.post('/add_favorite', routes.addFavorite);
+
+    router.post('/remove_favorite', routes.removeFavorite);
 
     router.post('/favorites', routes.getMyFavorites);
 
@@ -88,6 +90,10 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/mymatches', routes.getMyMatches);
 
     router.get('/user/:id', routes.getUserInfo);
+    
+    router.post('/visited_profile', routes.addVisitedProfile);
+    
+    router.post('/myvisitors', routes.getMyVisitors);
     
     
     

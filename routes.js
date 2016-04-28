@@ -156,7 +156,7 @@ exports.matches = function (req, res) {
     });
 };
 
-exports.makeFavorite = function (req, res) {
+exports.addFavorite = function (req, res) {
     var start = new Date();
     var query = "INSERT INTO favorites (profile_id, date) VALUES (" + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
     main.client.query(query, function (err, result) {
@@ -179,6 +179,21 @@ exports.makeFavorite = function (req, res) {
                     });
                 }
             });
+        }
+    });
+};
+
+exports.removeFavorite = function (req, res) {
+    var start = new Date();
+    var query = "DELETE FROM favorites WHERE id = (SELECT favorites.id FROM favorites INNER JOIN profile_fav ON favorites.id = profile_fav.favorite_id " +
+        "WHERE profile_fav.profile_id = " + req.body.my_id + " AND favorites.profile_id = " + req.body.profile_id + ")";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, info: "Favorite removed successfully!" });
         }
     });
 };
@@ -281,7 +296,19 @@ exports.getUserInfo = function (req, res) {
                         if (result.rows.length > 0) {
                             userObj.liked = result.rows[0].liked;
                         }
-                        res.status(200).json({success: true, data: userObj});
+                        start = new Date();
+                        var query = "SELECT * FROM favorites INNER JOIN profile_fav ON favorites.id = profile_fav.favorite_id WHERE " +
+                            "profile_fav.profile_id = " + req.headers.my_id + " AND favorites.profile_id = " + req.params.id + ";";
+                        main.client.query(query, function (err, result) {
+                            console.log('Query done in ' + (new Date() - start ) + 'ms');
+                            if (err) {
+                                res.status(500).json({success: false, error: err});
+                            }
+                            else {
+                                userObj.favorite = result.rows.length > 0;
+                                res.status(200).json({success: true, data: userObj});
+                            }
+                        });
                     }
                 });
             }
@@ -292,7 +319,47 @@ exports.getUserInfo = function (req, res) {
     // }
 };
 
+exports.addVisitedProfile = function (req, res) {
+    var start = new Date();
+    var query = "INSERT INTO visitors (visited_id, date) VALUES (" + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            start = new Date();
+            var query = "INSERT INTO profile_visitors (profile_id, visitor_id) VALUES (" + req.body.my_id + ", " + result.rows[0].id + ");";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({
+                        success: true,
+                        info: "Profile marked as visited successfully!"
+                    });
+                }
+            });
+        }
+    });
+};
 
+exports.getMyVisitors = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile_visitors INNER JOIN visitors ON profile_visitors.visitor_id = visitors.id INNER JOIN profile ON " +
+        "profile.id = profile_visitors.profile_id WHERE visitors.visited_id = " + req.body.my_id + ";";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, visitors: result.rows });
+        }
+    });
+};
 
 
 
