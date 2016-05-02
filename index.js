@@ -94,6 +94,8 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/visited_profile', routes.addVisitedProfile);
     
     router.post('/myvisitors', routes.getMyVisitors);
+
+    router.post('/search', routes.search);
     
     
     

@@ -158,26 +158,16 @@ exports.matches = function (req, res) {
 
 exports.addFavorite = function (req, res) {
     var start = new Date();
-    var query = "INSERT INTO favorites (profile_id, date) VALUES (" + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
+    var query = "INSERT INTO favorites (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "');";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            start = new Date();
-            var query = "INSERT INTO profile_fav (profile_id, favorite_id) VALUES (" + req.body.my_id + ", " + result.rows[0].id + ");";
-            main.client.query(query, function (err, result) {
-                console.log('Query done in ' + (new Date() - start ) + 'ms');
-                if (err) {
-                    res.status(500).json({ success: false, error: err });
-                }
-                else {
-                    res.status(200).json({
-                        success: true,
-                        info: "Favorite added successfully!"
-                    });
-                }
+            res.status(200).json({
+                success: true,
+                info: "Favorite added successfully!"
             });
         }
     });
@@ -185,8 +175,7 @@ exports.addFavorite = function (req, res) {
 
 exports.removeFavorite = function (req, res) {
     var start = new Date();
-    var query = "DELETE FROM favorites WHERE id = (SELECT favorites.id FROM favorites INNER JOIN profile_fav ON favorites.id = profile_fav.favorite_id " +
-        "WHERE profile_fav.profile_id = " + req.body.my_id + " AND favorites.profile_id = " + req.body.profile_id + ")";
+    var query = "DELETE FROM favorites WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -200,8 +189,22 @@ exports.removeFavorite = function (req, res) {
 
 exports.getMyFavorites = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM profile_fav INNER JOIN favorites ON profile_fav.favorite_id = favorites.id INNER JOIN profile ON " +
-        "profile.id = favorites.profile_id WHERE profile_fav.profile_id = " + req.body.profile_id + ";";
+    var query = "SELECT " +
+        "profile.id, " +
+        "profile.name, " +
+        "profile.email, " +
+        "profile.age, " +
+        "profile.gender, " +
+        "profile.aboutme, " +
+        "profile.work, " +
+        "profile.education, " +
+        "profile.location, " +
+        "profile.status, " +
+        "profile.pictures, " +
+        "profile.verified, " +
+        "profile.languages, " +
+        "favorites.date " +
+        "FROM profile INNER JOIN favorites ON profile.id = favorites.user_two_id WHERE favorites.user_one_id = " + req.body.profile_id + ";";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -216,8 +219,8 @@ exports.getMyFavorites = function (req, res) {
 exports.doLikeOrDislike = function (req, res) {
     var start = new Date();
     var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateFormatted(start) + "'";
-    var upsert = "UPDATE relationships SET liked = " + req.body.liked + " WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
-    var query = "WITH upsert AS (" + upsert + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
+    var update = "UPDATE relationships SET liked = " + req.body.liked + " WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
+    var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -234,10 +237,19 @@ exports.doLikeOrDislike = function (req, res) {
                 else {
                     if (result.rows.length > 0) {
                         //add a new match
-                        createMatch(start, req.body.my_id, req.body.other_id, res);
+                        var query = "INSERT INTO matches (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateFormatted(start) + "')";
+                        main.client.query(query, function (err, result) {
+                            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                            if (err) {
+                                res.status(500).json({success: false, error: err});
+                            }
+                            else {
+                                res.status(200).json({success: true, isMatch: true});
+                            }
+                        });
                     }
                     else {
-                        res.status(200).json({ success: true, isMatch: result.rows.length > 0 });
+                        res.status(200).json({ success: true, isMatch: false });
                     }
                 }
             });
@@ -247,8 +259,7 @@ exports.doLikeOrDislike = function (req, res) {
 
 exports.getMyMatches = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM profile_matches INNER JOIN matches ON profile_matches.match_id = matches.id INNER JOIN profile ON " +
-        "profile.id = matches.profile_id WHERE profile_matches.profile_id = " + req.body.my_id + ";";
+    var query = "SELECT * FROM matches INNER JOIN profile ON profile.id = matches.user_two_id WHERE matches.user_one_id = " + req.body.my_id + ";";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -297,8 +308,7 @@ exports.getUserInfo = function (req, res) {
                             userObj.liked = result.rows[0].liked;
                         }
                         start = new Date();
-                        var query = "SELECT * FROM favorites INNER JOIN profile_fav ON favorites.id = profile_fav.favorite_id WHERE " +
-                            "profile_fav.profile_id = " + req.headers.my_id + " AND favorites.profile_id = " + req.params.id + ";";
+                        var query = "SELECT * FROM favorites WHERE user_one_id = " + req.headers.my_id + " AND user_two_id = " + req.params.id + ";";
                         main.client.query(query, function (err, result) {
                             console.log('Query done in ' + (new Date() - start ) + 'ms');
                             if (err) {
@@ -321,26 +331,19 @@ exports.getUserInfo = function (req, res) {
 
 exports.addVisitedProfile = function (req, res) {
     var start = new Date();
-    var query = "INSERT INTO visitors (visited_id, date) VALUES (" + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
+    var insert = "INSERT INTO visitors (user_one_id, user_two_id, date) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "'";
+    var update = "UPDATE visitors SET date = '" + helpers.getDateFormatted(start) + "' WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
+    var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
+    console.log(query);
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            start = new Date();
-            var query = "INSERT INTO profile_visitors (profile_id, visitor_id) VALUES (" + req.body.my_id + ", " + result.rows[0].id + ");";
-            main.client.query(query, function (err, result) {
-                console.log('Query done in ' + (new Date() - start ) + 'ms');
-                if (err) {
-                    res.status(500).json({ success: false, error: err });
-                }
-                else {
-                    res.status(200).json({
-                        success: true,
-                        info: "Profile marked as visited successfully!"
-                    });
-                }
+            res.status(200).json({
+                success: true,
+                info: "Profile marked as visited successfully!"
             });
         }
     });
@@ -348,8 +351,22 @@ exports.addVisitedProfile = function (req, res) {
 
 exports.getMyVisitors = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM profile_visitors INNER JOIN visitors ON profile_visitors.visitor_id = visitors.id INNER JOIN profile ON " +
-        "profile.id = profile_visitors.profile_id WHERE visitors.visited_id = " + req.body.my_id + ";";
+    var query = "SELECT " +
+        "profile.id, " +
+        "profile.name, " +
+        "profile.email, " +
+        "profile.age, " +
+        "profile.gender, " +
+        "profile.aboutme, " +
+        "profile.work, " +
+        "profile.education, " +
+        "profile.location, " +
+        "profile.status, " +
+        "profile.pictures, " +
+        "profile.verified, " +
+        "profile.languages, " +
+        "visitors.date" +
+        " FROM profile INNER JOIN visitors ON profile.id = visitors.user_one_id WHERE visitors.user_two_id = " + req.body.my_id + ";";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -357,6 +374,20 @@ exports.getMyVisitors = function (req, res) {
         }
         else {
             res.status(200).json({ success: true, visitors: result.rows });
+        }
+    });
+};
+
+exports.search = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile WHERE id<> " + req.body.my_id + " AND name LIKE '%" + req.body.criteria + "%' ORDER BY id LIMIT 50";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, results: result.rows });
         }
     });
 };
@@ -400,45 +431,3 @@ exports.uploadPictures = function (req, res) {
         }
     });
 };
-
-function createMatch(start, my_id, other_id, res) {
-    var query = "INSERT INTO matches (profile_id, date) VALUES (" + other_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
-    main.client.query(query, function (err, result) {
-        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
-        if (err) {
-            res.status(500).json({success: false, error: err});
-        }
-        else {
-            start = new Date();
-            query = "INSERT INTO profile_matches (profile_id, match_id) VALUES (" + my_id + ", " + result.rows[0].id + ");";
-            main.client.query(query, function (err, result) {
-                console.log('Query done in ' + (new Date() - start ) + 'ms');
-                if (err) {
-                    res.status(500).json({success: false, error: err});
-                }
-                else {
-                    query = "INSERT INTO matches (profile_id, date) VALUES (" + my_id + ", '" + helpers.getDateFormatted(start) + "') RETURNING id;";
-                    main.client.query(query, function (err, result) {
-                        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
-                        if (err) {
-                            res.status(500).json({success: false, error: err});
-                        }
-                        else {
-                            start = new Date();
-                            var query = "INSERT INTO profile_matches (profile_id, match_id) VALUES (" + other_id + ", " + result.rows[0].id + ");";
-                            main.client.query(query, function (err, result) {
-                                console.log('Query done in ' + (new Date() - start ) + 'ms');
-                                if (err) {
-                                    res.status(500).json({success: false, error: err});
-                                }
-                                else {
-                                    res.status(200).json({success: true, isMatch: true});
-                                }
-                            });
-                        }
-                    });
-                }
-            });
-        }
-    });
-}
