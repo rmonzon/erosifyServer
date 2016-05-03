@@ -8,7 +8,8 @@ var client_token = "";
 
 exports.authentication = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
+    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "' WHERE email = '" + req.body.email + "';";
+    var query = update + "SELECT * FROM profile WHERE email='" + req.body.email + "';";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
