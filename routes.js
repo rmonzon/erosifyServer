@@ -38,7 +38,7 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified) VALUES (" +
+    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, coordinates) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.lastname + "', " +
         "'" + req.body.email + "', " +
@@ -49,7 +49,8 @@ exports.create_account = function(req, res) {
         "'" + req.body.location + "', " +
         "" + 1 + ", " +
         "" + req.body.pictures + ", " +
-        "" + 0 + ");";
+        "" + 0 + ", " +
+        "'" + JSON.stringify(req.body.coords) + "');";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
