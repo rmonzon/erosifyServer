@@ -2,9 +2,19 @@ var bcrypt = require('bcrypt-nodejs');
 var crypto = require('crypto');
 var main = require('./index');
 var fs = require('fs');
+var aws = require('aws-sdk');
 var helpers = require('./helpers');
 
 var client_token = "";
+
+var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
+var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
+var S3_BUCKET = process.env.S3_BUCKET;
+
+//only for testing locally
+// var AWS_ACCESS_KEY = "AKIAIVQJ3PBHYMB4GSXQ";
+// var AWS_SECRET_KEY = "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";
+// var S3_BUCKET = "erosifyimages";
 
 exports.authentication = function (req, res) {
     var start = new Date();
@@ -24,7 +34,6 @@ exports.authentication = function (req, res) {
                     });
                 }
                 else {
-                    console.log(result.rows[0].password);
                     res.status(200).json({ success: false, info: "Password is incorrect!" });
                 }
             }
@@ -50,32 +59,21 @@ exports.create_account = function(req, res) {
         "" + 1 + ", " +
         "" + req.body.pictures + ", " +
         "" + 0 + ", " +
-        "'" + JSON.stringify(req.body.coords) + "');";
+        "'" + JSON.stringify(req.body.coords) + "') RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
-            res.status(200).json({ success: false, error: err});
-            //res.json({message: errmsg});
+            res.status(200).json({success: false, error: err});
         }
         else {
-            start = new Date();
-            var query = "SELECT * FROM profile WHERE email='" + req.body.email + "';";
-            main.client.query(query, function (err, result) {
-                console.log('Query done in ' + (new Date() - start ) + 'ms');
-                if (err) {
-                    res.status(500).json({ success: false, error: err });
-                }
-                else {
-                    crypto.randomBytes(48, function (err, buffer) {
-                        client_token = buffer.toString('hex');
-                        res.status(200).json({
-                            success: true,
-                            token: client_token,
-                            user: result.rows[0],
-                            info: "Registration succeed!"
-                        });
-                    });
-                }
+            crypto.randomBytes(48, function (err, buffer) {
+                client_token = buffer.toString('hex');
+                res.status(200).json({
+                    success: true,
+                    token: client_token,
+                    user: result.rows[0],
+                    info: "Registration succeed!"
+                });
             });
         }
     });
@@ -336,7 +334,6 @@ exports.addVisitedProfile = function (req, res) {
     var insert = "INSERT INTO visitors (user_one_id, user_two_id, date) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "'";
     var update = "UPDATE visitors SET date = '" + helpers.getDateFormatted(start) + "' WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
-    console.log(query);
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -394,42 +391,82 @@ exports.search = function (req, res) {
     });
 };
 
+exports.updateUserPics = function (req, res) {
+    var start = new Date();
+    var query = "UPDATE profile SET pictures = " + req.body.pics + " WHERE id = " + req.body.user_id + " RETURNING *";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            console.log(err);
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, user: result.rows[0], info: "Profile pictures updated successfully!" });
+        }
+    });
+};
 
+/**
+ * Returns JSON containing the temporarily-signed S3 request and the anticipated URL of the image.
+ */
+exports.sign_s3 = function (req, res) {
+    aws.config.update({accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY});
+    var s3 = new aws.S3();
+    var s3_params = {
+        Bucket: S3_BUCKET,
+        Key: "profiles/user_" + req.headers.user_id + "/" + req.headers.file_name,
+        Expires: 60,
+        ContentType: req.headers.file_type,
+        ACL: 'public-read'
+    };
+    s3.getSignedUrl('putObject', s3_params, function (err, data) {
+        if (err) {
+            console.log(err);
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            var policy = {
+                "expiration": helpers.expiration_date(),
+                "conditions": [
+                    {"bucket": S3_BUCKET},
+                    ["eq", "$Content-Type", "image/jpeg"],
+                    ["starts-with", "$key", ""],
+                    {"acl": 'public-read'},
+                    ["content-length-range", 0, 10147483648]
+                ]
+            };
+            policy = new Buffer(JSON.stringify(policy)).toString('base64').replace(/\n|\r/, '');
+            var signature = crypto.createHmac("sha1", AWS_SECRET_KEY).update(policy).digest("base64");
 
+            var return_data = {
+                signed_request: data,
+                url: 'https://' + S3_BUCKET + '.s3.amazonaws.com/profiles/user_' + req.headers.user_id + "/" + req.headers.file_name,
 
+                //new stuff only for mobile
+                baseUrl: 'https://' + S3_BUCKET + '.s3.amazonaws.com/',
+                awsKey: AWS_ACCESS_KEY,
+                policy: policy,
+                signature: signature
+            };
+            res.status(200).json({ success: true, data: return_data });
+        }
+    });
+};
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-exports.uploadPictures = function (req, res) {
-    fs.readFile(req.file.path, function (err, data) {
-        var imageName = req.file.originalname;
-        // If there's an error
-        if (!imageName) {
-            console.log("There was an error");
-            res.status(500).json({success: false, error: err});
-        } else {
-            var newPath = __dirname + "/images/profiles/user_7/" + imageName;
-            fs.writeFile(newPath, data, function (err) {
-                if (err) {
-                    res.status(200).json({success: true, data: "Image uploaded successfully!"});
-                }
-                else {
-                    res.status(200).json({success: true, data: "Image uploaded successfully!"});
-                }
-            });
+/**
+ * Removes a specified image from the Amazon S3 bucket
+ */
+exports.removePictureFromS3 = function (req, res) {
+    aws.config.update({accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY});
+    var s3 = new aws.S3();
+    var params = {  Bucket: S3_BUCKET, Key: "profiles/user_" + req.headers.user_id + "/" + req.headers.file_name };
+    s3.deleteObject(params, function(err, data) {
+        if (err) {
+            console.log(err, err.stack); // an error occurred
+            res.status(500).json({ success: false, error: err.stack });
+        }
+        else {
+            res.status(200).json({ success: true, data: data });
         }
     });
 };

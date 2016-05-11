@@ -14,3 +14,15 @@ exports.getDateFormatted = function(today) {
     }
     return mm + '-' + dd + '-' + yyyy;
 };
+
+function pad(n) {
+    if ((n + "").length == 1) {
+        return "0" + n;
+    }
+    return "" + n;
+}
+
+exports.expiration_date = function() {
+    var _date = new Date();
+    return "" + (_date.getFullYear()) + "-" + (_date.getMonth() + 24) + "-" + (_date.getDate()) + "T" + (_date.getHours() + 1) + ":" + (_date.getMinutes()) + ":" + (_date.getSeconds()) + "Z";
+};

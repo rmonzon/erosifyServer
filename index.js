@@ -6,10 +6,7 @@ var bodyParser = require('body-parser');
 var cors = require('cors');
 var pg = require('pg');
 var _ = require('underscore');
-var http = require('http');
 var routes = require('./routes');
-var multer  = require('multer');
-var upload = multer({ dest: 'images/profiles/' });
 
 // read the config
 var config = {};
@@ -31,8 +28,6 @@ catch(err) {
     console.log(err);
     console.log('Usage: node ' + path.basename(__filename, path.extname(__filename)));
 }
-
-app.use(express.static('images'));
 
 // connect to the database and use a pool
 console.log("Connecting to database: " + config.dbURL.database);
@@ -96,15 +91,14 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/myvisitors', routes.getMyVisitors);
 
     router.post('/search', routes.search);
-    
-    
-    
-    
 
+    router.get('/sign_s3', routes.sign_s3);
 
-    router.post('/upload', upload.single('avatar'), routes.uploadPictures);
+    router.get('/remove_froms3', routes.removePictureFromS3);
 
-    router.post('/photos/user/upload/:uid', upload.array('photos', 12), routes.uploadPictures);
+    router.post('/update_pics', routes.updateUserPics);
+    
+    
 
     // register our router
     app.use('/api/v1/', router);
