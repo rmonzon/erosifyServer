@@ -7,14 +7,14 @@ var helpers = require('./helpers');
 
 var client_token = "";
 
-var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
-var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
-var S3_BUCKET = process.env.S3_BUCKET;
+// var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
+// var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
+// var S3_BUCKET = process.env.S3_BUCKET;
 
 //only for testing locally
-// var AWS_ACCESS_KEY = "AKIAIVQJ3PBHYMB4GSXQ";
-// var AWS_SECRET_KEY = "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";
-// var S3_BUCKET = "erosifyimages";
+var AWS_ACCESS_KEY = "AKIAIVQJ3PBHYMB4GSXQ";
+var AWS_SECRET_KEY = "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";
+var S3_BUCKET = "erosifyimages";
 
 exports.authentication = function (req, res) {
     var start = new Date();
@@ -47,7 +47,7 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, coordinates) VALUES (" +
+    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.lastname + "', " +
         "'" + req.body.email + "', " +
@@ -59,6 +59,7 @@ exports.create_account = function(req, res) {
         "" + 1 + ", " +
         "" + req.body.pictures + ", " +
         "" + 0 + ", " +
+        "" + req.body.languages + ", " +
         "'" + JSON.stringify(req.body.coords) + "') RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
@@ -379,7 +380,7 @@ exports.getMyVisitors = function (req, res) {
 
 exports.search = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM profile WHERE id<> " + req.body.my_id + " AND name LIKE '%" + req.body.criteria + "%' ORDER BY id LIMIT 50";
+    var query = "SELECT * FROM profile WHERE id<> " + req.body.my_id + " AND LOWER(name) LIKE '%" + req.body.criteria + "%' ORDER BY id LIMIT 50";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -470,3 +471,21 @@ exports.removePictureFromS3 = function (req, res) {
         }
     });
 };
+
+
+exports.addSubscribersToDB = function (req, res) {
+    var start = new Date();
+    var query = "INSERT INTO website_users (email, date, ip) VALUES ('" + req.body.email + "', '" + helpers.getDateFormatted(start) + "', '" + req.body.ip + "');";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({
+                success: true,
+                info: "User added successfully!"
+            });
+        }
+    });
+}; 

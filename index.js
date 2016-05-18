@@ -97,8 +97,8 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.get('/remove_froms3', routes.removePictureFromS3);
 
     router.post('/update_pics', routes.updateUserPics);
-    
-    
+
+    router.post('/addsubscriber', routes.addSubscribersToDB);
 
     // register our router
     app.use('/api/v1/', router);
