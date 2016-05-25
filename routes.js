@@ -18,7 +18,7 @@ var S3_BUCKET = "erosifyimages";
 
 exports.authentication = function (req, res) {
     var start = new Date();
-    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "' WHERE email = '" + req.body.email + "';";
+    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "', last_date_online = '" + helpers.getDateFormatted(start) + "' WHERE email = '" + req.body.email + "';";
     var query = update + "SELECT * FROM profile WHERE email='" + req.body.email + "';";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
@@ -47,7 +47,7 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates) VALUES (" +
+    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.lastname + "', " +
         "'" + req.body.email + "', " +
@@ -60,7 +60,10 @@ exports.create_account = function(req, res) {
         "" + req.body.pictures + ", " +
         "" + 0 + ", " +
         "" + req.body.languages + ", " +
-        "'" + JSON.stringify(req.body.coords) + "') RETURNING *;";
+        "'" + JSON.stringify(req.body.coords) + "', " +
+        "'" + helpers.getDateFormatted(start) + "', " +
+        "'" + helpers.getDateFormatted(start) + "', " +
+        "'" + req.body.looking_to + "') RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
@@ -129,6 +132,16 @@ exports.check_email = function (req, res) {
 };
 
 exports.matches = function (req, res) {
+    var filters = "";
+    if (req.body.gender) {
+        filters += " AND gender = '" + req.body.gender + "'";
+    }
+    if (req.body.looking_to) {
+        filters += " AND looking_to = '" + req.body.looking_to + "'";
+    }
+    if (req.body.ages) {
+        filters += " AND age >= " + req.body.ages.ageFrom + " AND age <= " + req.body.ages.ageTo;
+    }
     var start = new Date();
     var query = "SELECT " +
         "profile.id, " +
@@ -143,9 +156,11 @@ exports.matches = function (req, res) {
         "profile.status, " +
         "profile.pictures, " +
         "profile.verified, " +
-        "profile.languages " +
-        "FROM profile WHERE profile.id NOT IN (SELECT user_two_id FROM relationships WHERE user_one_id = " + req.body.id + ") AND id<>'" + req.body.id + "' ORDER BY profile.id;";
-
+        "profile.languages, " +
+        "profile.coordinates, " +
+        "profile.last_date_online, " +
+        "profile.looking_to " +
+        "FROM profile WHERE profile.id NOT IN (SELECT user_two_id FROM relationships WHERE user_one_id = " + req.body.id + ") AND id<>" + req.body.id + "" + filters + " ORDER BY profile.id;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -472,7 +487,6 @@ exports.removePictureFromS3 = function (req, res) {
     });
 };
 
-
 exports.addSubscribersToDB = function (req, res) {
     var start = new Date();
     var query = "INSERT INTO website_users (email, date, ip) VALUES ('" + req.body.email + "', '" + helpers.getDateFormatted(start) + "', '" + req.body.ip + "');";
@@ -488,4 +502,157 @@ exports.addSubscribersToDB = function (req, res) {
             });
         }
     });
-}; 
+};
+
+exports.reportUser = function (req, res) {
+    var start = new Date();
+    var query = "INSERT INTO reports (user_reporting_id, user_reported_id, reason, comments, date) VALUES (" + req.body.my_id + ", " + req.body.profile_id + ", '" + req.body.reason + "', '" + req.body.comments + "', '" + helpers.getDateFormatted(start) + "');";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({
+                success: true,
+                info: "Report added successfully!"
+            });
+        }
+    });
+};
+
+exports.updateUserInfo = function (req, res) {
+    client_token = "";
+    var looking = " ";
+    if (req.body.looking_to) {
+        looking = ", looking_to='" + req.body.looking_to + "'";
+    }
+    var start = new Date();
+    var query = "UPDATE profile SET " +
+        "work='" + req.body.work + "', " +
+        "education='" + req.body.education + "', " +
+        "aboutme='" + req.body.aboutme + "', " +
+        "languages='" + req.body.languages + "'" +
+        looking +
+        "WHERE id='" + req.body.user_id + "';";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, info: "User profile updated successfully!" });
+        }
+    });
+};
+
+exports.getMessagesByUser = function (req, res) {
+    var start = new Date();
+    var query = "SELECT " +
+        "sender_id, " +
+        "profile.name, " +
+        "COUNT(sender_id) AS unread_msg " +
+        "FROM messages INNER JOIN profile ON messages.sender_id = profile.id " +
+        "WHERE receiver_id = " + req.headers.my_id + " AND unread = 1 GROUP BY sender_id, profile.name";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            var unreadMsg = result.rows;
+            query = "SELECT " +
+                "profile.id, " +
+                "profile.name, " +
+                "profile.gender, " +
+                "profile.age, " +
+                "profile.status, " +
+                "profile.verified, " +
+                "profile.pictures, " +
+                "messages.message, " +
+                "messages.sent_date, " +
+                "messages.unread " +
+                "FROM profile INNER JOIN messages ON messages.sender_id = profile.id WHERE messages.receiver_id = " + req.headers.my_id + " ORDER BY messages.sent_date DESC";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    result.rows = helpers.removeDuplicatesMsg(result.rows);
+                    for (var i = 0; i < result.rows.length; i++) {
+                        result.rows[i].numUnreadMsg = 0;
+                        for (var j = 0; j < unreadMsg.length; j++) {
+                            if (result.rows[i].id == unreadMsg[j].sender_id) {
+                                result.rows[i].numUnreadMsg = unreadMsg[j].unread_msg;
+                                break;
+                            }
+                        }
+                    }
+                    res.status(200).json({success: true, messages: result.rows});
+                }
+            });
+        }
+    });
+};
+
+//pending for review
+exports.getMessagesByConversation = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM messages WHERE sender_id = " + req.headers.my_id + " AND receiver_id = " + req.headers.user_id + " ORDER BY sent_date;";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({success: false, error: err});
+        }
+        else {
+            var messages = result.rows;
+            start = new Date();
+            query = "SELECT * FROM messages WHERE sender_id = " + req.headers.user_id + " AND receiver_id = " + req.headers.my_id + " ORDER BY sent_date;";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({success: false, error: err});
+                }
+                else {
+                    for (var i = 0; i < result.rows.length; i++) {
+                        messages.push(result.rows[i]);
+                    }
+                    res.status(200).json({success: true, conversation: messages});
+                }
+            });
+        }
+    });
+};
+
+exports.saveMessage = function (req, res) {
+    var start = new Date();
+    var query = "INSERT INTO messages (sender_id, receiver_id, message, sent_date, unread) VALUES (" + req.body.sender_id + ", " + req.body.receiver_id + ", '" + req.body.msg + "', '" + helpers.getDateTimeFormatted(start) + "', " + req.body.unread + ");";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({
+                success: true,
+                info: "Message saved successfully!"
+            });
+        }
+    });
+};
+
+//TODO: implement the rest of notification requests for the side menu
+exports.getNotifications = function (req, res) {
+    var start = new Date();
+    var query = "SELECT COUNT(*) AS unread_msg FROM messages WHERE receiver_id = " + req.headers.my_id + " AND unread = 1";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, notifications: result.rows[0].unread_msg });
+        }
+    });
+};

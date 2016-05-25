@@ -15,14 +15,27 @@ exports.getDateFormatted = function(today) {
     return mm + '-' + dd + '-' + yyyy;
 };
 
-function pad(n) {
-    if ((n + "").length == 1) {
-        return "0" + n;
-    }
-    return "" + n;
-}
+exports.getDateTimeFormatted = function (date) {
+    var hours = date.getHours(), minutes = date.getMinutes(), secs = date.getSeconds();
+    hours = hours < 10 ? '0' + hours : hours;
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    secs = secs < 10 ? '0' + secs : secs;
+    var time = hours + ':' + minutes + ':' + secs;
+    return exports.getDateFormatted(date) + " " + time;
+};
 
 exports.expiration_date = function() {
     var _date = new Date();
     return "" + (_date.getFullYear()) + "-" + (_date.getMonth() + 24) + "-" + (_date.getDate()) + "T" + (_date.getHours() + 1) + ":" + (_date.getMinutes()) + ":" + (_date.getSeconds()) + "Z";
+};
+
+exports.removeDuplicatesMsg = function (array) {
+    var visited = {}, newArray = [];
+    for (var i = 0, len = array.length; i < len; ++i) {
+        if (!visited[array[i].id]) {
+            newArray.push(array[i]);
+            visited[array[i].id] = true;
+        }
+    }
+    return newArray;
 };

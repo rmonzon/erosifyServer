@@ -8,6 +8,10 @@ var pg = require('pg');
 var _ = require('underscore');
 var routes = require('./routes');
 
+var passport = require('passport');
+var jwt = require('jwt-simple');
+var morgan = require('morgan');
+
 // read the config
 var config = {};
 
@@ -39,14 +43,17 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     exports.client = client;
 
-    // add some middlewares
-    // simple logger
-    app.use(function (req, res, next) {
-        console.log('%s %s', req.method, req.url);
-        next();
-    });
     app.use(cors());
-    app.use(bodyParser());
+
+    // get our request parameters
+    app.use(bodyParser.urlencoded({ extended: false }));
+    app.use(bodyParser.json());
+
+    // log to console
+    app.use(morgan('dev'));
+
+    // Use the passport package in our application
+    app.use(passport.initialize());
 
     // create a router
     var router = express.Router();
@@ -99,6 +106,18 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/update_pics', routes.updateUserPics);
 
     router.post('/addsubscriber', routes.addSubscribersToDB);
+
+    router.post('/report_user', routes.reportUser);
+
+    router.post('/update_profile', routes.updateUserInfo);
+
+    router.get('/messages', routes.getMessagesByUser);
+
+    router.get('/conversation', routes.getMessagesByConversation);
+
+    router.post('/save_message', routes.saveMessage);
+
+    router.get('/notifications', routes.getNotifications);
 
     // register our router
     app.use('/api/v1/', router);
