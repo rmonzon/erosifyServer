@@ -627,7 +627,7 @@ exports.getMessagesByConversation = function (req, res) {
 
 exports.saveMessage = function (req, res) {
     var start = new Date();
-    var query = "INSERT INTO messages (sender_id, receiver_id, message, sent_date, unread) VALUES (" + req.body.sender_id + ", " + req.body.receiver_id + ", '" + req.body.msg + "', '" + helpers.getDateTimeFormatted(start) + "', " + req.body.unread + ");";
+    var query = "INSERT INTO messages (sender_id, receiver_id, message, sent_date, unread) VALUES (" + req.body.sender_id + ", " + req.body.receiver_id + ", '" + req.body.msg + "', '" + req.body.sent_date + "', " + req.body.unread + ");";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
