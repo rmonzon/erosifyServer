@@ -557,7 +557,7 @@ exports.getMessagesByUser = function (req, res) {
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
-            res.status(500).json({ success: false, error: err });
+            res.status(500).json({success: false, error: err});
         }
         else {
             var unreadMsg = result.rows;
@@ -574,22 +574,51 @@ exports.getMessagesByUser = function (req, res) {
                 "messages.unread " +
                 "FROM profile INNER JOIN messages ON messages.sender_id = profile.id WHERE messages.receiver_id = " + req.headers.my_id + " ORDER BY messages.sent_date DESC";
             main.client.query(query, function (err, result) {
-                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                console.log('Query done in ' + (new Date() - start) + 'ms with no problems');
                 if (err) {
-                    res.status(500).json({ success: false, error: err });
+                    res.status(500).json({success: false, error: err});
                 }
                 else {
-                    result.rows = helpers.removeDuplicatesMsg(result.rows);
-                    for (var i = 0; i < result.rows.length; i++) {
-                        result.rows[i].numUnreadMsg = 0;
+                    var messages = helpers.removeDuplicatesMsg(result.rows);
+                    for (var i = 0; i < messages.length; i++) {
+                        messages[i].numUnreadMsg = 0;
                         for (var j = 0; j < unreadMsg.length; j++) {
-                            if (result.rows[i].id == unreadMsg[j].sender_id) {
-                                result.rows[i].numUnreadMsg = unreadMsg[j].unread_msg;
+                            if (messages[i].id == unreadMsg[j].sender_id) {
+                                messages[i].numUnreadMsg = unreadMsg[j].unread_msg;
                                 break;
                             }
                         }
                     }
-                    res.status(200).json({success: true, messages: result.rows});
+                    if (messages.length == 0) {
+                        query = "SELECT " +
+                            "profile.id, " +
+                            "profile.name, " +
+                            "profile.gender, " +
+                            "profile.age, " +
+                            "profile.status, " +
+                            "profile.verified, " +
+                            "profile.pictures, " +
+                            "messages.message, " +
+                            "messages.sent_date, " +
+                            "messages.unread " +
+                            "FROM profile INNER JOIN messages ON messages.receiver_id = profile.id WHERE messages.sender_id = " + req.headers.my_id + " ORDER BY messages.sent_date DESC";
+                        main.client.query(query, function (err, result) {
+                            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                            if (err) {
+                                res.status(500).json({success: false, error: err});
+                            }
+                            else {
+                                result.rows = helpers.removeDuplicatesMsg(result.rows);
+                                for (var i = 0; i < result.rows.length; i++) {
+                                    messages.push(result.rows[i]);
+                                }
+                                res.status(200).json({success: true, messages: messages});
+                            }
+                        });
+                    }
+                    else {
+                        res.status(200).json({success: true, messages: messages});
+                    }
                 }
             });
         }
