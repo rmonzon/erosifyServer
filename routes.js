@@ -647,6 +647,7 @@ exports.getMessagesByConversation = function (req, res) {
                     for (var i = 0; i < result.rows.length; i++) {
                         messages.push(result.rows[i]);
                     }
+                    messages = helpers.sortArrayByDates(messages);
                     res.status(200).json({success: true, conversation: messages});
                 }
             });
