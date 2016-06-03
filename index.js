@@ -117,6 +117,8 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/save_message', routes.saveMessage);
 
+    router.post('/peoplenearby', routes.getPeopleNearby);
+
     router.get('/notifications', routes.getNotifications);
 
     // register our router

@@ -243,32 +243,37 @@ exports.doLikeOrDislike = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            start = new Date();
-            var query = "SELECT * FROM relationships WHERE user_one_id = " + req.body.other_id + " AND user_two_id = " + req.body.my_id + " AND liked = 1;";
-            main.client.query(query, function (err, result) {
-                console.log('Query done in ' + (new Date() - start ) + 'ms');
-                if (err) {
-                    res.status(500).json({ success: false, error: err });
-                }
-                else {
-                    if (result.rows.length > 0) {
-                        //add a new match
-                        var query = "INSERT INTO matches (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateFormatted(start) + "')";
-                        main.client.query(query, function (err, result) {
-                            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
-                            if (err) {
-                                res.status(500).json({success: false, error: err});
-                            }
-                            else {
-                                res.status(200).json({success: true, isMatch: true});
-                            }
-                        });
+            if (req.body.liked == 1) {
+                start = new Date();
+                var query = "SELECT * FROM relationships WHERE user_one_id = " + req.body.other_id + " AND user_two_id = " + req.body.my_id + " AND liked = 1;";
+                main.client.query(query, function (err, result) {
+                    console.log('Query done in ' + (new Date() - start ) + 'ms');
+                    if (err) {
+                        res.status(500).json({ success: false, error: err });
                     }
                     else {
-                        res.status(200).json({ success: true, isMatch: false });
+                        if (result.rows.length > 0) {
+                            //add a new match
+                            var query = "INSERT INTO matches (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateFormatted(start) + "')";
+                            main.client.query(query, function (err, result) {
+                                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                                if (err) {
+                                    res.status(500).json({success: false, error: err});
+                                }
+                                else {
+                                    res.status(200).json({success: true, isMatch: true});
+                                }
+                            });
+                        }
+                        else {
+                            res.status(200).json({ success: true, isMatch: false });
+                        }
                     }
-                }
-            });
+                });
+            }
+            else {
+                res.status(200).json({ success: true, isMatch: false });
+            }
         }
     });
 };
@@ -667,6 +672,38 @@ exports.saveMessage = function (req, res) {
                 success: true,
                 info: "Message saved successfully!"
             });
+        }
+    });
+};
+
+exports.getPeopleNearby = function (req, res) {
+    var start = new Date();
+    var filters = "";
+    if (req.body.gender) {
+        filters += " AND gender = '" + req.body.gender + "'";
+    }
+    if (req.body.looking_to) {
+        filters += " AND looking_to = '" + req.body.looking_to + "'";
+    }
+    if (req.body.ages) {
+        filters += " AND age >= " + req.body.ages.ageFrom + " AND age <= " + req.body.ages.ageTo;
+    }
+    var query = "SELECT " +
+        "id, " +
+        "name, " +
+        "age, " +
+        "coordinates, " +
+        "status, " +
+        "verified, " +
+        "pictures " +
+        "FROM profile WHERE id<>" + req.body.id + " AND location LIKE '%USA%' AND location LIKE '%" + req.body.state + "%'" + filters + " ORDER BY id";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, people: result.rows });
         }
     });
 };
