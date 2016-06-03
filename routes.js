@@ -18,7 +18,7 @@ var S3_BUCKET = "erosifyimages";
 
 exports.authentication = function (req, res) {
     var start = new Date();
-    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "', last_date_online = '" + helpers.getDateFormatted(start) + "' WHERE email = '" + req.body.email + "';";
+    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "', last_date_online = '" + helpers.getDateFormatted(start) + "', status = 1 WHERE email = '" + req.body.email + "';";
     var query = update + "SELECT * FROM profile WHERE email='" + req.body.email + "';";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
@@ -624,10 +624,10 @@ exports.getMessagesByUser = function (req, res) {
     });
 };
 
-//pending for review
 exports.getMessagesByConversation = function (req, res) {
     var start = new Date();
-    var query = "SELECT * FROM messages WHERE sender_id = " + req.headers.my_id + " AND receiver_id = " + req.headers.user_id + " ORDER BY sent_date;";
+    var query = "UPDATE messages SET unread = 0 WHERE receiver_id = " + req.headers.my_id + " AND sender_id = " + req.headers.user_id + " AND unread = 1;" +
+        "SELECT * FROM messages WHERE sender_id = " + req.headers.my_id + " AND receiver_id = " + req.headers.user_id + " ORDER BY sent_date;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
