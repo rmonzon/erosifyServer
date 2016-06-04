@@ -47,7 +47,7 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to) VALUES (" +
+    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.lastname + "', " +
         "'" + req.body.email + "', " +
@@ -63,7 +63,8 @@ exports.create_account = function(req, res) {
         "'" + JSON.stringify(req.body.coords) + "', " +
         "'" + helpers.getDateFormatted(start) + "', " +
         "'" + helpers.getDateFormatted(start) + "', " +
-        "'" + req.body.looking_to + "') RETURNING *;";
+        "'" + req.body.looking_to + "', " +
+        "" + 0 + ") RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
@@ -237,6 +238,8 @@ exports.doLikeOrDislike = function (req, res) {
     var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateFormatted(start) + "'";
     var update = "UPDATE relationships SET liked = " + req.body.liked + " WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
+    var newScore = req.body.liked == 1 ? 2 : -1;
+    query += "UPDATE profile SET score = (SELECT score FROM profile WHERE id = " + req.body.other_id + ") + " + newScore + " WHERE id = " + req.body.other_id;
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -355,6 +358,7 @@ exports.addVisitedProfile = function (req, res) {
     var insert = "INSERT INTO visitors (user_one_id, user_two_id, date) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "'";
     var update = "UPDATE visitors SET date = '" + helpers.getDateFormatted(start) + "' WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
+    query += "UPDATE profile SET score = (SELECT score FROM profile WHERE id = " + req.body.profile_id + ") + 1 WHERE id = " + req.body.profile_id;
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
