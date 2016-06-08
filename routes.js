@@ -26,19 +26,27 @@ exports.authentication = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            if (result.rows[0]) {
-                if (bcrypt.compareSync(req.body.password, result.rows[0].password)) {
-                    crypto.randomBytes(48, function(err, buffer) {
-                        client_token = buffer.toString('hex');
-                        res.status(200).json({ success: true, token: client_token, user: result.rows[0], info: "Authentication succeed!" });
-                    });
+            if (req.body.password) {
+                if (result.rows[0]) {
+                    if (bcrypt.compareSync(req.body.password, result.rows[0].password)) {
+                        crypto.randomBytes(48, function(err, buffer) {
+                            client_token = buffer.toString('hex');
+                            res.status(200).json({ success: true, token: client_token, user: result.rows[0], info: "Authentication succeed!" });
+                        });
+                    }
+                    else {
+                        res.status(200).json({ success: false, info: "Password is incorrect!" });
+                    }
                 }
                 else {
-                    res.status(200).json({ success: false, info: "Password is incorrect!" });
+                    res.status(200).json({ success: false, info: "Email does not exist!" });
                 }
             }
             else {
-                res.status(200).json({ success: false, info: "Email does not exist!" });
+                crypto.randomBytes(48, function(err, buffer) {
+                    client_token = buffer.toString('hex');
+                    res.status(200).json({ success: true, token: client_token, user: result.rows[0], info: "Authentication succeed!" });
+                });
             }
         }
     });
@@ -65,6 +73,45 @@ exports.create_account = function(req, res) {
         "'" + helpers.getDateFormatted(start) + "', " +
         "'" + req.body.looking_to + "', " +
         "" + 0 + ") RETURNING *;";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms');
+        if (err) {
+            res.status(200).json({success: false, error: err});
+        }
+        else {
+            crypto.randomBytes(48, function (err, buffer) {
+                client_token = buffer.toString('hex');
+                res.status(200).json({
+                    success: true,
+                    token: client_token,
+                    user: result.rows[0],
+                    info: "Registration succeed!"
+                });
+            });
+        }
+    });
+};
+
+exports.create_account_fb = function(req, res) {
+    var start = new Date();
+    var query = "INSERT INTO profile (name, lastname, email, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id) VALUES (" +
+        "'" + req.body.name + "', " +
+        "'" + req.body.lastname + "', " +
+        "'" + req.body.email + "', " +
+        "'" + req.body.dob + "', " +
+        "'" + req.body.gender + "', " +
+        "" + req.body.age + ", " +
+        "'" + req.body.location + "', " +
+        "" + 1 + ", " +
+        "" + req.body.pictures + ", " +
+        "" + 0 + ", " +
+        "" + req.body.languages + ", " +
+        "'" + JSON.stringify(req.body.coords) + "', " +
+        "'" + helpers.getDateFormatted(start) + "', " +
+        "'" + helpers.getDateFormatted(start) + "', " +
+        "'" + req.body.looking_to + "', " +
+        "" + 0 + ", " +
+        "" + req.body.facebook_id + ") RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {

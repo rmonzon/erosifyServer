@@ -69,6 +69,8 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.post('/create_account', routes.create_account);
 
+    router.post('/create_fb_account', routes.create_account_fb);
+
     router.post('/authentication', routes.authentication);
 
     router.post('/me', routes.me);
