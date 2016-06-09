@@ -46,6 +46,16 @@ exports.sortArrayByDates = function (array) {
     });
 };
 
+exports.sortNetworkByRelevance = function (array) {
+    var hash = [];
+    for (var i = 0, len = array.length; i < len; ++i) {
+        if (isNaN(hash[array[i]])) {
+            hash[array[i]] = 0;
+        }
+        hash[array[i]]++;
+    }
+};
+
 /**
  * Custom non-enumerable sortBy function using a Schwartzian transform technique on all arrays
  */

@@ -26,12 +26,14 @@ exports.authentication = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
+            var currentUser = result.rows[0];
+            //regular email authentication
             if (req.body.password) {
                 if (result.rows[0]) {
-                    if (bcrypt.compareSync(req.body.password, result.rows[0].password)) {
+                    if (bcrypt.compareSync(req.body.password, currentUser.password)) {
                         crypto.randomBytes(48, function(err, buffer) {
                             client_token = buffer.toString('hex');
-                            res.status(200).json({ success: true, token: client_token, user: result.rows[0], info: "Authentication succeed!" });
+                            res.status(200).json({ success: true, token: client_token, user: currentUser, info: "Authentication succeed!" });
                         });
                     }
                     else {
@@ -42,10 +44,29 @@ exports.authentication = function (req, res) {
                     res.status(200).json({ success: false, info: "Email does not exist!" });
                 }
             }
+            //facebook authentication
             else {
-                crypto.randomBytes(48, function(err, buffer) {
-                    client_token = buffer.toString('hex');
-                    res.status(200).json({ success: true, token: client_token, user: result.rows[0], info: "Authentication succeed!" });
+                query = "";
+                if (req.body.friends) {
+                    for (var i = 0; i < req.body.friends.length; i++) {
+                        query += "INSERT INTO friends (user_one_id, user_two_id) SELECT * FROM (SELECT " + currentUser.id + ", (SELECT id FROM profile " +
+                            "WHERE facebook_id = '" + req.body.friends[i].id + "')) AS tmp WHERE NOT EXISTS (SELECT user_one_id, user_two_id FROM friends " +
+                            "WHERE user_one_id = " + currentUser.id + " AND user_two_id = (SELECT id FROM profile WHERE " +
+                            "facebook_id = '" + req.body.friends[i].id + "')) LIMIT 1;";
+                    }
+                }
+                console.log(query);
+                main.client.query(query, function (err, result) {
+                    console.log('Query done in ' + (new Date() - start ) + 'ms');
+                    if (err) {
+                        res.status(500).json({ success: false, error: err });
+                    }
+                    else {
+                        crypto.randomBytes(48, function(err, buffer) {
+                            client_token = buffer.toString('hex');
+                            res.status(200).json({ success: true, token: client_token, user: currentUser, info: "Authentication succeed!" });
+                        });
+                    }
                 });
             }
         }
@@ -55,9 +76,9 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, lastname, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score) VALUES (" +
+    var query = "INSERT INTO profile (name, full_name, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score) VALUES (" +
         "'" + req.body.name + "', " +
-        "'" + req.body.lastname + "', " +
+        "'" + req.body.full_name + "', " +
         "'" + req.body.email + "', " +
         "'" + passwordEnc + "', " +
         "'" + req.body.dob + "', " +
@@ -94,9 +115,9 @@ exports.create_account = function(req, res) {
 
 exports.create_account_fb = function(req, res) {
     var start = new Date();
-    var query = "INSERT INTO profile (name, lastname, email, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id) VALUES (" +
+    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id) VALUES (" +
         "'" + req.body.name + "', " +
-        "'" + req.body.lastname + "', " +
+        "'" + req.body.full_name + "', " +
         "'" + req.body.email + "', " +
         "'" + req.body.dob + "', " +
         "'" + req.body.gender + "', " +
@@ -118,15 +139,40 @@ exports.create_account_fb = function(req, res) {
             res.status(200).json({success: false, error: err});
         }
         else {
-            crypto.randomBytes(48, function (err, buffer) {
-                client_token = buffer.toString('hex');
-                res.status(200).json({
-                    success: true,
-                    token: client_token,
-                    user: result.rows[0],
-                    info: "Registration succeed!"
+            var newUser = result.rows[0];
+            if (req.body.friends) {
+                for (var i = 0; i < req.body.friends.length; i++) {
+                    query += "INSERT INTO friends (user_one_id, user_two_id) VALUES (" + newUser.id + ", (SELECT id FROM profile WHERE facebook_id = '" + req.body.friends[i].id + "'));";
+                }
+                main.client.query(query, function (err, result) {
+                    console.log('Query done in ' + (new Date() - start ) + 'ms');
+                    if (err) {
+                        res.status(200).json({success: false, error: err});
+                    }
+                    else {
+                        crypto.randomBytes(48, function (err, buffer) {
+                            client_token = buffer.toString('hex');
+                            res.status(200).json({
+                                success: true,
+                                token: client_token,
+                                user: newUser,
+                                info: "Registration succeed!"
+                            });
+                        });
+                    }
                 });
-            });
+            }
+            else {
+                crypto.randomBytes(48, function (err, buffer) {
+                    client_token = buffer.toString('hex');
+                    res.status(200).json({
+                        success: true,
+                        token: client_token,
+                        user: newUser,
+                        info: "Registration succeed!"
+                    });
+                });
+            }
         }
     });
 };
