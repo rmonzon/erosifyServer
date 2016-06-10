@@ -46,6 +46,20 @@ exports.sortArrayByDates = function (array) {
     });
 };
 
+exports.findDuplicatesInArray = function (array) {
+    var visited = {}, newArray = [];
+    for (var i = 0, len = array.length; i < len; ++i) {
+        if (isNaN(visited[array[i].id])) {
+            visited[array[i].id] = 0;
+        }
+        visited[array[i].id]++;
+        if (visited[array[i].id] == 2) {
+            newArray.push(array[i]);
+        }
+    }
+    return newArray;
+};
+
 exports.sortNetworkByRelevance = function (array) {
     var hash = [];
     for (var i = 0, len = array.length; i < len; ++i) {

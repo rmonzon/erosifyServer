@@ -123,6 +123,8 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.get('/notifications', routes.getNotifications);
 
+    router.get('/common_friends/:id', routes.getCommonFriends);
+
     // register our router
     app.use('/api/v1/', router);
 

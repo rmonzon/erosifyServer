@@ -805,6 +805,36 @@ exports.getPeopleNearby = function (req, res) {
     });
 };
 
+exports.getCommonFriends = function (req, res) {
+    var start = new Date();
+    var query = "SELECT profile.id, profile.name, profile.pictures FROM profile INNER JOIN friends ON profile.id = friends.user_two_id " +
+        "WHERE user_one_id = " + req.params.id + ";";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            var listFriends = result.rows;
+            query = "SELECT profile.id, profile.name, profile.pictures FROM profile INNER JOIN friends ON profile.id = friends.user_two_id " +
+                "WHERE user_one_id = " + req.headers.my_id + ";";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    for (var i = 0, len = result.rows.length; i < len; ++i) {
+                        listFriends.push(result.rows[i]);
+                    }
+                    listFriends = helpers.findDuplicatesInArray(listFriends);
+                    res.status(200).json({success: true, commonFriends: listFriends, total: listFriends.length});
+                }
+            });
+        }
+    });
+};
+
 //TODO: implement the rest of notification requests for the side menu
 exports.getNotifications = function (req, res) {
     var start = new Date();
