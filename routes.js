@@ -18,7 +18,7 @@ var S3_BUCKET = "erosifyimages";
 
 exports.authentication = function (req, res) {
     var start = new Date();
-    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "', last_date_online = '" + helpers.getDateFormatted(start) + "', status = 1 WHERE email = '" + req.body.email + "';";
+    var update = "UPDATE profile SET location = '" + req.body.location + "', coordinates = '" + JSON.stringify(req.body.coords) + "', last_date_online = '" + helpers.getDateTimeFormatted(start) + "', status = 1 WHERE email = '" + req.body.email + "';";
     var query = update + "SELECT * FROM profile WHERE email='" + req.body.email + "';";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
@@ -76,7 +76,7 @@ exports.authentication = function (req, res) {
 exports.create_account = function(req, res) {
     var start = new Date();
     var passwordEnc = bcrypt.hashSync(req.body.password);
-    var query = "INSERT INTO profile (name, full_name, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score) VALUES (" +
+    var query = "INSERT INTO profile (name, full_name, email, password, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, premium_member) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.full_name + "', " +
         "'" + req.body.email + "', " +
@@ -90,9 +90,10 @@ exports.create_account = function(req, res) {
         "" + 0 + ", " +
         "" + req.body.languages + ", " +
         "'" + JSON.stringify(req.body.coords) + "', " +
-        "'" + helpers.getDateFormatted(start) + "', " +
-        "'" + helpers.getDateFormatted(start) + "', " +
+        "'" + helpers.getDateTimeFormatted(start) + "', " +
+        "'" + helpers.getDateTimeFormatted(start) + "', " +
         "'" + req.body.looking_to + "', " +
+        "" + 0 + ", " +
         "" + 0 + ") RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
@@ -115,7 +116,7 @@ exports.create_account = function(req, res) {
 
 exports.create_account_fb = function(req, res) {
     var start = new Date();
-    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id) VALUES (" +
+    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id, premium_member) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.full_name + "', " +
         "'" + req.body.email + "', " +
@@ -128,11 +129,12 @@ exports.create_account_fb = function(req, res) {
         "" + 0 + ", " +
         "" + req.body.languages + ", " +
         "'" + JSON.stringify(req.body.coords) + "', " +
-        "'" + helpers.getDateFormatted(start) + "', " +
-        "'" + helpers.getDateFormatted(start) + "', " +
+        "'" + helpers.getDateTimeFormatted(start) + "', " +
+        "'" + helpers.getDateTimeFormatted(start) + "', " +
         "'" + req.body.looking_to + "', " +
         "" + 0 + ", " +
-        "" + req.body.facebook_id + ") RETURNING *;";
+        "" + req.body.facebook_id + ", " +
+        "" + 0 + ") RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
@@ -180,7 +182,7 @@ exports.create_account_fb = function(req, res) {
 exports.me = function (req, res) {
     if (req.headers.token && req.headers.token === client_token) {
         var start = new Date();
-        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "';SELECT * FROM profile WHERE email='" + req.body.email + "';";
+        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "';SELECT id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member FROM profile WHERE email='" + req.body.email + "';";
         main.client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
@@ -253,7 +255,8 @@ exports.matches = function (req, res) {
         "profile.languages, " +
         "profile.coordinates, " +
         "profile.last_date_online, " +
-        "profile.looking_to " +
+        "profile.looking_to, " +
+        "facebook_id " +
         "FROM profile WHERE profile.id NOT IN (SELECT user_two_id FROM relationships WHERE user_one_id = " + req.body.id + ") AND id<>" + req.body.id + "" + filters + " ORDER BY profile.id;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
@@ -268,7 +271,7 @@ exports.matches = function (req, res) {
 
 exports.addFavorite = function (req, res) {
     var start = new Date();
-    var query = "INSERT INTO favorites (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "');";
+    var query = "INSERT INTO favorites (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateTimeFormatted(start) + "');";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -313,6 +316,7 @@ exports.getMyFavorites = function (req, res) {
         "profile.pictures, " +
         "profile.verified, " +
         "profile.languages, " +
+        "profile.facebook_id, " +
         "favorites.date " +
         "FROM profile INNER JOIN favorites ON profile.id = favorites.user_two_id WHERE favorites.user_one_id = " + req.body.profile_id + ";";
     main.client.query(query, function (err, result) {
@@ -328,7 +332,7 @@ exports.getMyFavorites = function (req, res) {
 
 exports.doLikeOrDislike = function (req, res) {
     var start = new Date();
-    var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateFormatted(start) + "'";
+    var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateTimeFormatted(start) + "'";
     var update = "UPDATE relationships SET liked = " + req.body.liked + " WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
     var newScore = req.body.liked == 1 ? 2 : -1;
@@ -350,7 +354,7 @@ exports.doLikeOrDislike = function (req, res) {
                     else {
                         if (result.rows.length > 0) {
                             //add a new match
-                            var query = "INSERT INTO matches (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateFormatted(start) + "')";
+                            var query = "INSERT INTO matches (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateTimeFormatted(start) + "')";
                             main.client.query(query, function (err, result) {
                                 console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
                                 if (err) {
@@ -405,7 +409,7 @@ exports.getMyLikes = function (req, res) {
 exports.getUserInfo = function (req, res) {
     //if (req.headers.token && req.headers.token === client_token) {
         var start = new Date();
-        var query = "SELECT * FROM profile WHERE id = " + req.params.id + ";";
+        var query = "SELECT id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member FROM profile WHERE id = " + req.params.id + ";";
         main.client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
@@ -448,8 +452,8 @@ exports.getUserInfo = function (req, res) {
 
 exports.addVisitedProfile = function (req, res) {
     var start = new Date();
-    var insert = "INSERT INTO visitors (user_one_id, user_two_id, date) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateFormatted(start) + "'";
-    var update = "UPDATE visitors SET date = '" + helpers.getDateFormatted(start) + "' WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
+    var insert = "INSERT INTO visitors (user_one_id, user_two_id, date) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateTimeFormatted(start) + "'";
+    var update = "UPDATE visitors SET date = '" + helpers.getDateTimeFormatted(start) + "' WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
     query += "UPDATE profile SET score = (SELECT score FROM profile WHERE id = " + req.body.profile_id + ") + 1 WHERE id = " + req.body.profile_id;
     main.client.query(query, function (err, result) {
@@ -482,6 +486,7 @@ exports.getMyVisitors = function (req, res) {
         "profile.pictures, " +
         "profile.verified, " +
         "profile.languages, " +
+        "profile.facebook_id, " +
         "visitors.date" +
         " FROM profile INNER JOIN visitors ON profile.id = visitors.user_one_id WHERE visitors.user_two_id = " + req.body.my_id + ";";
     main.client.query(query, function (err, result) {
@@ -608,7 +613,7 @@ exports.addSubscribersToDB = function (req, res) {
 
 exports.reportUser = function (req, res) {
     var start = new Date();
-    var query = "INSERT INTO reports (user_reporting_id, user_reported_id, reason, comments, date) VALUES (" + req.body.my_id + ", " + req.body.profile_id + ", '" + req.body.reason + "', '" + req.body.comments + "', '" + helpers.getDateFormatted(start) + "');";
+    var query = "INSERT INTO reports (user_reporting_id, user_reported_id, reason, comments, date) VALUES (" + req.body.my_id + ", " + req.body.profile_id + ", '" + req.body.reason + "', '" + req.body.comments + "', '" + helpers.getDateTimeFormatted(start) + "');";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -792,7 +797,8 @@ exports.getPeopleNearby = function (req, res) {
         "coordinates, " +
         "status, " +
         "verified, " +
-        "pictures " +
+        "pictures, " +
+        "facebook_id " +
         "FROM profile WHERE id<>" + req.body.id + " AND location LIKE '%USA%' AND location LIKE '%" + req.body.state + "%'" + filters + " ORDER BY id";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
