@@ -55,7 +55,6 @@ exports.authentication = function (req, res) {
                             "facebook_id = '" + req.body.friends[i].id + "')) LIMIT 1;";
                     }
                 }
-                console.log(query);
                 main.client.query(query, function (err, result) {
                     console.log('Query done in ' + (new Date() - start ) + 'ms');
                     if (err) {
@@ -182,7 +181,7 @@ exports.create_account_fb = function(req, res) {
 exports.me = function (req, res) {
     if (req.headers.token && req.headers.token === client_token) {
         var start = new Date();
-        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "';SELECT id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member FROM profile WHERE email='" + req.body.email + "';";
+        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member;";
         main.client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
@@ -332,8 +331,8 @@ exports.getMyFavorites = function (req, res) {
 
 exports.doLikeOrDislike = function (req, res) {
     var start = new Date();
-    var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateTimeFormatted(start) + "'";
-    var update = "UPDATE relationships SET liked = " + req.body.liked + " WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
+    var insert = "INSERT INTO relationships (user_one_id, user_two_id, liked, date, unread) SELECT " + req.body.my_id + ", " + req.body.other_id + ", " + req.body.liked + ", '" + helpers.getDateTimeFormatted(start) + "', 1";
+    var update = "UPDATE relationships SET liked = " + req.body.liked + ", unread = 1 WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.other_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
     var newScore = req.body.liked == 1 ? 2 : -1;
     query += "UPDATE profile SET score = (SELECT score FROM profile WHERE id = " + req.body.other_id + ") + " + newScore + " WHERE id = " + req.body.other_id;
@@ -354,7 +353,7 @@ exports.doLikeOrDislike = function (req, res) {
                     else {
                         if (result.rows.length > 0) {
                             //add a new match
-                            var query = "INSERT INTO matches (user_one_id, user_two_id, date) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateTimeFormatted(start) + "')";
+                            var query = "INSERT INTO matches (user_one_id, user_two_id, date, unread) VALUES (" + req.body.my_id + ", " + req.body.other_id + ", '" + helpers.getDateTimeFormatted(start) + "', 1)";
                             main.client.query(query, function (err, result) {
                                 console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
                                 if (err) {
@@ -387,7 +386,17 @@ exports.getMyMatches = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            res.status(200).json({ success: true, matches: result.rows });
+            var matches = result.rows;
+            query = "UPDATE matches SET unread = 0 WHERE user_two_id = " + req.body.my_id;
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({ success: true, matches: matches });
+                }
+            });
         }
     });
 };
@@ -401,7 +410,17 @@ exports.getMyLikes = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            res.status(200).json({ success: true, likes: result.rows });
+            var likes = result.rows;
+            query = "UPDATE relationships SET unread = 0 WHERE user_two_id = " + req.body.my_id;
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({ success: true, likes: likes });
+                }
+            });
         }
     });
 };
@@ -452,8 +471,8 @@ exports.getUserInfo = function (req, res) {
 
 exports.addVisitedProfile = function (req, res) {
     var start = new Date();
-    var insert = "INSERT INTO visitors (user_one_id, user_two_id, date) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateTimeFormatted(start) + "'";
-    var update = "UPDATE visitors SET date = '" + helpers.getDateTimeFormatted(start) + "' WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
+    var insert = "INSERT INTO visitors (user_one_id, user_two_id, date, unread) SELECT " + req.body.my_id + ", " + req.body.profile_id + ", '" + helpers.getDateTimeFormatted(start) + "', 1";
+    var update = "UPDATE visitors SET date = '" + helpers.getDateTimeFormatted(start) + "', unread = 1 WHERE user_one_id = " + req.body.my_id + " AND user_two_id = " + req.body.profile_id;
     var query = "WITH upsert AS (" + update + " RETURNING *) " + insert + " WHERE NOT EXISTS (SELECT * FROM upsert);";
     query += "UPDATE profile SET score = (SELECT score FROM profile WHERE id = " + req.body.profile_id + ") + 1 WHERE id = " + req.body.profile_id;
     main.client.query(query, function (err, result) {
@@ -487,7 +506,8 @@ exports.getMyVisitors = function (req, res) {
         "profile.verified, " +
         "profile.languages, " +
         "profile.facebook_id, " +
-        "visitors.date" +
+        "visitors.date, " +
+        "visitors.unread" +
         " FROM profile INNER JOIN visitors ON profile.id = visitors.user_one_id WHERE visitors.user_two_id = " + req.body.my_id + ";";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
@@ -495,7 +515,17 @@ exports.getMyVisitors = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            res.status(200).json({ success: true, visitors: result.rows });
+            var visitors = result.rows;
+            query = "UPDATE visitors SET unread = 0 WHERE user_two_id = " + req.body.my_id;
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({ success: true, visitors: visitors });
+                }
+            });
         }
     });
 };
@@ -641,14 +671,14 @@ exports.updateUserInfo = function (req, res) {
         "aboutme='" + req.body.aboutme + "', " +
         "languages='" + req.body.languages + "'" +
         looking +
-        "WHERE id='" + req.body.user_id + "';";
+        "WHERE id='" + req.body.user_id + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            res.status(200).json({ success: true, info: "User profile updated successfully!" });
+            res.status(200).json({ success: true, user: result.rows[0], info: "User profile updated successfully!" });
         }
     });
 };
@@ -844,6 +874,7 @@ exports.getCommonFriends = function (req, res) {
 //TODO: implement the rest of notification requests for the side menu
 exports.getNotifications = function (req, res) {
     var start = new Date();
+    var notif = {unread_msg: 0, new_likes: 0, new_visitors: 0};
     var query = "SELECT COUNT(*) AS unread_msg FROM messages WHERE receiver_id = " + req.headers.my_id + " AND unread = 1";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
@@ -851,7 +882,38 @@ exports.getNotifications = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            res.status(200).json({ success: true, notifications: result.rows[0].unread_msg });
+            notif.unread_msg = result.rows[0].unread_msg;
+            query = "SELECT COUNT(*) AS new_likes FROM relationships WHERE user_two_id = " + req.headers.my_id + " AND unread = 1";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    notif.new_likes = result.rows[0].new_likes;
+                    query = "SELECT COUNT(*) AS new_visitors FROM visitors WHERE user_two_id = " + req.headers.my_id + " AND unread = 1";
+                    main.client.query(query, function (err, result) {
+                        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                        if (err) {
+                            res.status(500).json({ success: false, error: err });
+                        }
+                        else {
+                            notif.new_visitors = result.rows[0].new_visitors;
+                            query = "SELECT COUNT(*) AS new_matches FROM matches WHERE user_two_id = " + req.headers.my_id + " AND unread = 1";
+                            main.client.query(query, function (err, result) {
+                                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                                if (err) {
+                                    res.status(500).json({ success: false, error: err });
+                                }
+                                else {
+                                    notif.new_matches = result.rows[0].new_matches;
+                                    res.status(200).json({ success: true, notifications: notif });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
         }
     });
 };
