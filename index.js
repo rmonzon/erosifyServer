@@ -125,6 +125,8 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.get('/common_friends/:id', routes.getCommonFriends);
 
+    router.get('/messages_likes', routes.getMessagesAndLikesTotal);
+
     // register our router
     app.use('/api/v1/', router);
 

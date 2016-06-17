@@ -60,14 +60,51 @@ exports.findDuplicatesInArray = function (array) {
     return newArray;
 };
 
-exports.sortNetworkByRelevance = function (array) {
-    var hash = [];
-    for (var i = 0, len = array.length; i < len; ++i) {
-        if (isNaN(hash[array[i]])) {
-            hash[array[i]] = 0;
+/**
+ * Sort 'matches' array to put first the friends of my friends
+ * @param my_id
+ * @param friends
+ * @param matches
+ * @returns {Array}
+ */
+exports.sortNetworkByFriendsOfFriends = function (my_id, friends, matches) {
+    var hash = {};
+    for (var i = 0, len = friends.length; i < len; ++i) {
+        if (friends[i].id != my_id) {
+            if (isNaN(hash[friends[i].id])) {
+                hash[friends[i].id] = 0;
+            }
+            hash[friends[i].id]++;
         }
-        hash[array[i]]++;
     }
+    var newMatches = [];
+    for (var key in hash) {
+        // skip loop if the property is from prototype
+        if (!hash.hasOwnProperty(key))
+            continue;
+        newMatches.push({num: key, count: hash[key]});
+    }
+    newMatches.sortBy(function (elem) {
+        return elem.count;
+    });
+    var matchesIds = [];
+    for (i = 0, len = matches.length; i < len; ++i) {
+        matchesIds.push(matches[i].id);
+    }
+    for (i = 0, len = newMatches.length; i < len; ++i) {
+        var n = parseInt(newMatches[i].num);
+        var index = matchesIds.indexOf(n);
+        matchesIds.splice(index, 1);
+        matchesIds.splice(0, 0, n);
+    }
+    var finalMatches = [], pos = 0;
+    for (i = 0, len = matches.length; i < len; ++i) {
+        pos = matchesIds.indexOf(matches[i].id);
+        if (pos >= 0) {
+            finalMatches[pos] = matches[i];
+        }
+    }
+    return finalMatches;
 };
 
 /**

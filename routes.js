@@ -115,7 +115,7 @@ exports.create_account = function(req, res) {
 
 exports.create_account_fb = function(req, res) {
     var start = new Date();
-    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, location, status, pictures, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id, premium_member) VALUES (" +
+    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, location, status, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id, premium_member, facebook_photos) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.full_name + "', " +
         "'" + req.body.email + "', " +
@@ -124,7 +124,6 @@ exports.create_account_fb = function(req, res) {
         "" + req.body.age + ", " +
         "'" + req.body.location + "', " +
         "" + 1 + ", " +
-        "" + req.body.pictures + ", " +
         "" + 0 + ", " +
         "" + req.body.languages + ", " +
         "'" + JSON.stringify(req.body.coords) + "', " +
@@ -133,7 +132,9 @@ exports.create_account_fb = function(req, res) {
         "'" + req.body.looking_to + "', " +
         "" + 0 + ", " +
         "" + req.body.facebook_id + ", " +
-        "" + 0 + ") RETURNING *;";
+        "" + 0 + ", " +
+        "" + req.body.facebook_photos + ", " +
+        ") RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
@@ -181,7 +182,7 @@ exports.create_account_fb = function(req, res) {
 exports.me = function (req, res) {
     if (req.headers.token && req.headers.token === client_token) {
         var start = new Date();
-        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member;";
+        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member, facebook_photos;";
         main.client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
@@ -255,7 +256,8 @@ exports.matches = function (req, res) {
         "profile.coordinates, " +
         "profile.last_date_online, " +
         "profile.looking_to, " +
-        "facebook_id " +
+        "profile.facebook_id, " +
+        "profile.facebook_photos " +
         "FROM profile WHERE profile.id NOT IN (SELECT user_two_id FROM relationships WHERE user_one_id = " + req.body.id + ") AND id<>" + req.body.id + "" + filters + " ORDER BY profile.id;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
@@ -263,7 +265,38 @@ exports.matches = function (req, res) {
             res.status(500).json({ success: false, error: err });
         }
         else {
-            res.status(200).json({ success: true, matches: result.rows });
+            var matches = result.rows;
+            //get the friends of my friends to give more relevance to the algorithm
+            query = "SELECT user_two_id AS id FROM friends WHERE user_one_id IN (SELECT user_two_id FROM friends WHERE user_one_id = " + req.body.id + ")";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    matches = helpers.sortNetworkByFriendsOfFriends(req.body.id, result.rows, matches);
+                    //get users who have liked me to put them at the top of the results list
+                    query = "SELECT user_one_id AS id FROM relationships WHERE user_two_id = " + req.body.id + " AND liked = 1";
+                    main.client.query(query, function (err, result) {
+                        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                        if (err) {
+                            res.status(500).json({ success: false, error: err });
+                        }
+                        else {
+                            var user_likes = result.rows.map(function (item) { return item.id; }), sorted_matches = [];
+                            for (var i = 0, len = matches.length; i < len; ++i) {
+                                if (user_likes.indexOf(matches[i].id) >= 0) {
+                                    sorted_matches.splice(0, 0, matches[i]);
+                                }
+                                else {
+                                    sorted_matches.push(matches[i]);
+                                }
+                            }
+                            res.status(200).json({ success: true, matches: sorted_matches });
+                        }
+                    });
+                }
+            });
         }
     });
 };
@@ -316,6 +349,7 @@ exports.getMyFavorites = function (req, res) {
         "profile.verified, " +
         "profile.languages, " +
         "profile.facebook_id, " +
+        "profile.facebook_photos, " +
         "favorites.date " +
         "FROM profile INNER JOIN favorites ON profile.id = favorites.user_two_id WHERE favorites.user_one_id = " + req.body.profile_id + ";";
     main.client.query(query, function (err, result) {
@@ -428,7 +462,7 @@ exports.getMyLikes = function (req, res) {
 exports.getUserInfo = function (req, res) {
     //if (req.headers.token && req.headers.token === client_token) {
         var start = new Date();
-        var query = "SELECT id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member FROM profile WHERE id = " + req.params.id + ";";
+        var query = "SELECT id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member, facebook_photos FROM profile WHERE id = " + req.params.id + ";";
         main.client.query(query, function (err, result) {
             console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
             if (err) {
@@ -506,6 +540,7 @@ exports.getMyVisitors = function (req, res) {
         "profile.verified, " +
         "profile.languages, " +
         "profile.facebook_id, " +
+        "profile.facebook_photos, " +
         "visitors.date, " +
         "visitors.unread" +
         " FROM profile INNER JOIN visitors ON profile.id = visitors.user_one_id WHERE visitors.user_two_id = " + req.body.my_id + ";";
@@ -546,7 +581,14 @@ exports.search = function (req, res) {
 
 exports.updateUserPics = function (req, res) {
     var start = new Date();
-    var query = "UPDATE profile SET pictures = " + req.body.pics + " WHERE id = " + req.body.user_id + " RETURNING *";
+    var subquery = [];
+    if (req.body.amazon_pics) {
+        subquery.push("pictures = " + req.body.amazon_pics);
+    }
+    if (req.body.facebook_pics) {
+        subquery.push("facebook_photos = " + req.body.facebook_pics);
+    }
+    var query = "UPDATE profile SET " + subquery.join(', ') + " WHERE id = " + req.body.user_id + " RETURNING *";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -671,7 +713,7 @@ exports.updateUserInfo = function (req, res) {
         "aboutme='" + req.body.aboutme + "', " +
         "languages='" + req.body.languages + "'" +
         looking +
-        "WHERE id='" + req.body.user_id + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member;";
+        "WHERE id='" + req.body.user_id + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member, facebook_photos;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
         if (err) {
@@ -708,6 +750,7 @@ exports.getMessagesByUser = function (req, res) {
                 "profile.status, " +
                 "profile.verified, " +
                 "profile.pictures, " +
+                "profile.facebook_photos, " +
                 "messages.message, " +
                 "messages.sent_date, " +
                 "messages.unread " +
@@ -738,6 +781,7 @@ exports.getMessagesByUser = function (req, res) {
                         "profile.status, " +
                         "profile.verified, " +
                         "profile.pictures, " +
+                        "profile.facebook_photos, " +
                         "messages.message, " +
                         "messages.sent_date, " +
                         "messages.unread " +
@@ -828,6 +872,7 @@ exports.getPeopleNearby = function (req, res) {
         "status, " +
         "verified, " +
         "pictures, " +
+        "facebook_photos, " +
         "facebook_id " +
         "FROM profile WHERE id<>" + req.body.id + " AND location LIKE '%USA%' AND location LIKE '%" + req.body.state + "%'" + filters + " ORDER BY id";
     main.client.query(query, function (err, result) {
@@ -843,7 +888,7 @@ exports.getPeopleNearby = function (req, res) {
 
 exports.getCommonFriends = function (req, res) {
     var start = new Date();
-    var query = "SELECT profile.id, profile.name, profile.pictures FROM profile INNER JOIN friends ON profile.id = friends.user_two_id " +
+    var query = "SELECT profile.id, profile.name, profile.pictures, profile.facebook_photos FROM profile INNER JOIN friends ON profile.id = friends.user_two_id " +
         "WHERE user_one_id = " + req.params.id + ";";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
@@ -852,7 +897,7 @@ exports.getCommonFriends = function (req, res) {
         }
         else {
             var listFriends = result.rows;
-            query = "SELECT profile.id, profile.name, profile.pictures FROM profile INNER JOIN friends ON profile.id = friends.user_two_id " +
+            query = "SELECT profile.id, profile.name, profile.pictures, profile.facebook_photos FROM profile INNER JOIN friends ON profile.id = friends.user_two_id " +
                 "WHERE user_one_id = " + req.headers.my_id + ";";
             main.client.query(query, function (err, result) {
                 console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
@@ -871,7 +916,6 @@ exports.getCommonFriends = function (req, res) {
     });
 };
 
-//TODO: implement the rest of notification requests for the side menu
 exports.getNotifications = function (req, res) {
     var start = new Date();
     var notif = {unread_msg: 0, new_likes: 0, new_visitors: 0};
@@ -912,6 +956,30 @@ exports.getNotifications = function (req, res) {
                             });
                         }
                     });
+                }
+            });
+        }
+    });
+};
+
+exports.getMessagesAndLikesTotal = function (req, res) {
+    var start = new Date();
+    var query = "SELECT COUNT(*) AS total_msgs FROM messages WHERE receiver_id = " + req.headers.my_id + " OR sender_id = " + req.headers.my_id + ";";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            var totalMsgs = result.rows[0].total_msgs;
+            query = "SELECT COUNT(*) AS total_likes FROM relationships WHERE user_two_id = " + req.headers.my_id + " AND liked = 1;";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    res.status(200).json({success: true, totalMsgs: totalMsgs, totalLikes: result.rows[0].total_likes});
                 }
             });
         }
