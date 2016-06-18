@@ -114,6 +114,8 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/update_profile', routes.updateUserInfo);
 
     router.get('/messages', routes.getMessagesByUser);
+    
+    router.post('/message_viewed', routes.markMessageAsViewed);
 
     router.get('/conversation', routes.getMessagesByConversation);
 
