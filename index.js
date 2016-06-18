@@ -127,6 +127,8 @@ pg.connect(config.dbURL, function(err, client, done) {
 
     router.get('/messages_likes', routes.getMessagesAndLikesTotal);
 
+    router.post('/delete_account', routes.deleteAccount);
+
     // register our router
     app.use('/api/v1/', router);
 

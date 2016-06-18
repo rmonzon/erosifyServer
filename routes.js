@@ -985,3 +985,68 @@ exports.getMessagesAndLikesTotal = function (req, res) {
         }
     });
 };
+
+exports.deleteAccount = function (req, res) {
+    var start = new Date();
+    var query = "SELECT * FROM profile WHERE id = " + req.body.my_id;
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            var u = result.rows[0];
+            query = "INSERT INTO deleted_accounts (" +
+                "name, " +
+                "full_name, " +
+                "email, " +
+                "password, " +
+                "dob, " +
+                "gender, " +
+                "location, " +
+                "pictures, " +
+                "verified, " +
+                "languages, " +
+                "coordinates, " +
+                "signup_date, " +
+                "looking_to, " +
+                "score, " +
+                "premium_member, " +
+                "deleted_date) VALUES (" +
+                "'" + u.name + "', " +
+                "'" + u.full_name + "', " +
+                "'" + u.email + "', " +
+                "'" + u.password + "', " +
+                "'" + helpers.getDateFormatted(new Date(u.dob)) + "', " +
+                "'" + u.gender + "', " +
+                "'" + u.location + "', " +
+                "'{" + u.pictures + "}', " +
+                "" + u.verified + ", " +
+                "'{" + u.languages + "}', " +
+                "'" + u.coordinates + "', " +
+                "'" + helpers.getDateTimeFormatted(new Date(u.signup_date)) + "', " +
+                "'" + u.looking_to + "', " +
+                "" + u.score + ", " +
+                "" + u.premium_member + ", " +
+                "'" + helpers.getDateTimeFormatted(start) + "')";
+            main.client.query(query, function (err, result) {
+                console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                if (err) {
+                    res.status(500).json({ success: false, error: err });
+                }
+                else {
+                    query = "DELETE FROM profile WHERE id = " + req.body.my_id;
+                    main.client.query(query, function (err, result) {
+                        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+                        if (err) {
+                            res.status(500).json({ success: false, error: err });
+                        }
+                        else {
+                            res.status(200).json({ success: true, info: "Account removed successfully!" });     
+                        }
+                    });
+                }
+            });
+        }
+    });
+};
