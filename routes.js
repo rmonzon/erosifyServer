@@ -97,7 +97,7 @@ exports.create_account = function(req, res) {
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
-            res.status(200).json({success: false, error: err});
+            res.status(500).json({success: false, error: err});
         }
         else {
             crypto.randomBytes(48, function (err, buffer) {
@@ -115,13 +115,15 @@ exports.create_account = function(req, res) {
 
 exports.create_account_fb = function(req, res) {
     var start = new Date();
-    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, location, status, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id, premium_member, facebook_photos) VALUES (" +
+    var query = "INSERT INTO profile (name, full_name, email, dob, gender, age, work, education, location, status, verified, languages, coordinates, signup_date, last_date_online, looking_to, score, facebook_id, premium_member, facebook_photos) VALUES (" +
         "'" + req.body.name + "', " +
         "'" + req.body.full_name + "', " +
         "'" + req.body.email + "', " +
         "'" + req.body.dob + "', " +
         "'" + req.body.gender + "', " +
         "" + req.body.age + ", " +
+        "'" + req.body.work + "', " +
+        "'" + req.body.education + "', " +
         "'" + req.body.location + "', " +
         "" + 1 + ", " +
         "" + 0 + ", " +
@@ -133,23 +135,24 @@ exports.create_account_fb = function(req, res) {
         "" + 0 + ", " +
         "" + req.body.facebook_id + ", " +
         "" + 0 + ", " +
-        "" + req.body.facebook_photos + ", " +
+        "" + req.body.facebook_photos + "" +
         ") RETURNING *;";
     main.client.query(query, function (err, result) {
         console.log('Query done in ' + (new Date() - start ) + 'ms');
         if (err) {
-            res.status(200).json({success: false, error: err});
+            res.status(500).json({success: false, error: err});
         }
         else {
             var newUser = result.rows[0];
             if (req.body.friends) {
+                query = "";
                 for (var i = 0; i < req.body.friends.length; i++) {
                     query += "INSERT INTO friends (user_one_id, user_two_id) VALUES (" + newUser.id + ", (SELECT id FROM profile WHERE facebook_id = '" + req.body.friends[i].id + "'));";
                 }
                 main.client.query(query, function (err, result) {
                     console.log('Query done in ' + (new Date() - start ) + 'ms');
                     if (err) {
-                        res.status(200).json({success: false, error: err});
+                        res.status(500).json({success: false, error: err});
                     }
                     else {
                         crypto.randomBytes(48, function (err, buffer) {
