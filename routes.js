@@ -55,6 +55,7 @@ exports.authentication = function (req, res) {
                             "facebook_id = '" + req.body.friends[i].id + "')) LIMIT 1;";
                     }
                 }
+                query += "DELETE FROM friends WHERE user_two_id IS NULL";
                 main.client.query(query, function (err, result) {
                     console.log('Query done in ' + (new Date() - start ) + 'ms');
                     if (err) {
@@ -149,6 +150,7 @@ exports.create_account_fb = function(req, res) {
                 for (var i = 0; i < req.body.friends.length; i++) {
                     query += "INSERT INTO friends (user_one_id, user_two_id) VALUES (" + newUser.id + ", (SELECT id FROM profile WHERE facebook_id = '" + req.body.friends[i].id + "'));";
                 }
+                query += "DELETE FROM friends WHERE user_two_id IS NULL";
                 main.client.query(query, function (err, result) {
                     console.log('Query done in ' + (new Date() - start ) + 'ms');
                     if (err) {
