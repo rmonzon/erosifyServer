@@ -104,6 +104,11 @@ exports.sortNetworkByFriendsOfFriends = function (my_id, friends, matches) {
             finalMatches[pos] = matches[i];
         }
     }
+    for (i = 0, len = finalMatches.length; i < len; ++i) {
+        if (!finalMatches[i]) {
+            finalMatches.splice(i, 1);
+        }
+    }
     return finalMatches;
 };
 
