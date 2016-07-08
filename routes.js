@@ -185,22 +185,22 @@ exports.create_account_fb = function(req, res) {
 };
 
 exports.me = function (req, res) {
-    if (req.headers.token && req.headers.token === client_token) {
-        var start = new Date();
-        var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member, facebook_photos;";
-        main.client.query(query, function (err, result) {
-            console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
-            if (err) {
-                res.status(500).json({ success: false, error: err });
-            }
-            else {
-                res.status(200).json({ success: true, data: result.rows[0] });
-            }
-        });
-    }
-    else {
-        res.status(401).json({ success: false, error: "Wrong or expired token!" });
-    }
+    // if (req.headers.token && req.headers.token === client_token) {
+    var start = new Date();
+    var query = "UPDATE profile SET status = 1 WHERE email='" + req.body.email + "' RETURNING id, name, full_name, email, gender, age, aboutme, work, education, location, status, pictures, verified, languages, coordinates, looking_to, score, facebook_id, premium_member, facebook_photos;";
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({success: false, error: err});
+        }
+        else {
+            res.status(200).json({success: true, data: result.rows[0]});
+        }
+    });
+    // }
+    // else {
+    //     res.status(401).json({ success: false, error: "Wrong or expired token!" });
+    // }
 };
 
 exports.logout = function (req, res) {
