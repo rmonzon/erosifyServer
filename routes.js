@@ -290,11 +290,13 @@ exports.matches = function (req, res) {
                         else {
                             var user_likes = result.rows.map(function (item) { return item.id; }), sorted_matches = [];
                             for (var i = 0, len = matches.length; i < len; ++i) {
-                                if (user_likes.indexOf(matches[i].id) >= 0) {
-                                    sorted_matches.splice(0, 0, matches[i]);
-                                }
-                                else {
-                                    sorted_matches.push(matches[i]);
+                                if (matches[i]) {
+                                    if (user_likes.indexOf(matches[i].id) >= 0) {
+                                        sorted_matches.splice(0, 0, matches[i]);
+                                    }
+                                    else {
+                                        sorted_matches.push(matches[i]);
+                                    }
                                 }
                             }
                             res.status(200).json({ success: true, matches: sorted_matches });
@@ -426,13 +428,15 @@ exports.getMyMatches = function (req, res) {
         }
         else {
             var matches = result.rows;
-            query = "UPDATE matches SET unread = 0 WHERE user_two_id = " + req.body.my_id;
+            query = "UPDATE matches SET unread = 0 WHERE user_two_id = " + req.body.my_id + ";";
+            query += "SELECT * FROM matches INNER JOIN profile ON profile.id = matches.user_one_id WHERE matches.user_two_id = " + req.body.my_id + ";";
             main.client.query(query, function (err, result) {
                 console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
                 if (err) {
                     res.status(500).json({ success: false, error: err });
                 }
                 else {
+                    matches = matches.concat(result.rows);
                     res.status(200).json({ success: true, matches: matches });
                 }
             });
@@ -1068,6 +1072,20 @@ exports.deleteAccount = function (req, res) {
                     });
                 }
             });
+        }
+    });
+};
+
+exports.setUserStatus = function (req, res) {
+    var start = new Date();
+    var query = "UPDATE profile SET status = " + req.body.status + " WHERE id = " + req.body.my_id;
+    main.client.query(query, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, status: "Status changed successfully!" });
         }
     });
 };
