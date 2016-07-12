@@ -132,6 +132,8 @@ pg.connect(config.dbURL, function(err, client, done) {
     router.post('/delete_account', routes.deleteAccount);
 
     router.post('/user_status', routes.setUserStatus);
+    
+    router.post('/remove_messages', routes.removeConversations);
 
     // register our router
     app.use('/api/v1/', router);

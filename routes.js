@@ -1089,3 +1089,20 @@ exports.setUserStatus = function (req, res) {
         }
     });
 };
+
+exports.removeConversations = function (req, res) {
+    var start = new Date();
+    var queries = "";
+    for (var i = 0; i < req.body.ids.length; ++i) {
+        queries += "DELETE FROM messages WHERE sender_id = " + req.body.ids[i] + " AND receiver_id = " + req.body.my_id + " OR sender_id = " + req.body.my_id + " AND receiver_id = " + req.body.ids[i] + ";";
+    }
+    main.client.query(queries, function (err, result) {
+        console.log('Query done in ' + (new Date() - start ) + 'ms with no problems');
+        if (err) {
+            res.status(500).json({ success: false, error: err });
+        }
+        else {
+            res.status(200).json({ success: true, status: "Messages removed successfully!" });
+        }
+    });
+};
