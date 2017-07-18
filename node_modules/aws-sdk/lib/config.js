@@ -1,6 +1,7 @@
 var AWS = require('./core');
 require('./credentials');
 require('./credentials/credential_provider_chain');
+var PromisesDependency;
 
 /**
  * The main configuration class used by all service objects to set
@@ -77,6 +78,10 @@ require('./credentials/credential_provider_chain');
  *   @return [Boolean] whether the provided endpoint addresses an individual
  *     bucket (false if it addresses the root API endpoint).
  *
+ * @!attribute s3DisableBodySigning
+ *   @return [Boolean] whether to disable S3 body signing when using signature version `v4`.
+ *     Body signing can only be disabled when using https. Defaults to `true`.
+ *
  * @!attribute useAccelerateEndpoint
  *   @note This configuration option is only compatible with S3 while accessing
  *     dns-compatible buckets.
@@ -91,12 +96,12 @@ require('./credentials/credential_provider_chain');
  *     AWS.config.update({retryDelayOptions: {customBackoff: function(retryCount) {
  *       // returns delay in ms
  *     }}});
- *   @note This works with all services except DynamoDB.
  *   @return [map] A set of options to configure the retry delay on retryable errors.
  *     Currently supported options are:
  *
  *     * **base** [Integer] &mdash; The base number of milliseconds to use in the
- *       exponential backoff for operation retries. Defaults to 100 ms.
+ *       exponential backoff for operation retries. Defaults to 100 ms for all services except
+ *       DynamoDB, where it defaults to 50ms.
  *     * **customBackoff ** [function] &mdash; A custom function that accepts a retry count
  *       and returns the amount of time to delay in milliseconds. The `base` option will be
  *       ignored if this option is supplied.
@@ -203,11 +208,16 @@ AWS.Config = AWS.util.inherit({
    *   addresses an individual bucket (false if it addresses the root API
    *   endpoint). Note that setting this configuration option requires an
    *   `endpoint` to be provided explicitly to the service constructor.
+   * @option options s3DisableBodySigning [Boolean] whether S3 body signing
+   *   should be disabled when using signature version `v4`. Body signing
+   *   can only be disabled when using https. Defaults to `true`.
+   *
    * @option options retryDelayOptions [map] A set of options to configure
    *   the retry delay on retryable errors. Currently supported options are:
    *
    *   * **base** [Integer] &mdash; The base number of milliseconds to use in the
-   *     exponential backoff for operation retries. Defaults to 100 ms.
+   *     exponential backoff for operation retries. Defaults to 100 ms for all
+   *     services except DynamoDB, where it defaults to 50ms.
    *   * **customBackoff ** [function] &mdash; A custom function that accepts a retry count
    *     and returns the amount of time to delay in milliseconds. The `base` option will be
    *     ignored if this option is supplied.
@@ -221,6 +231,10 @@ AWS.Config = AWS.util.inherit({
    *     SSL connections, a special Agent object is used in order to enable
    *     peer certificate verification. This feature is only available in the
    *     Node.js environment.
+   *   * **connectTimeout** [Integer] &mdash; Sets the socket to timeout after
+   *     failing to establish a connection with the server after
+   *     `connectTimeout` milliseconds. This timeout has no effect once a socket
+   *     connection has been established.
    *   * **timeout** [Integer] &mdash; Sets the socket to timeout after timeout
    *     milliseconds of inactivity on the socket. Defaults to two minutes
    *     (120000).
@@ -253,6 +267,8 @@ AWS.Config = AWS.util.inherit({
    * @option options signatureCache [Boolean] whether the signature to sign
    *   requests with (overriding the API configuration) is cached. Only applies
    *   to the signature version 'v4'. Defaults to `true`.
+   * @option options dynamoDbCrc32 [Boolean] whether to validate the CRC32
+   *   checksum of HTTP response bodies returned by DynamoDB. Default: `true`.
    */
   constructor: function Config(options) {
     if (options === undefined) options = {};
@@ -287,7 +303,7 @@ AWS.Config = AWS.util.inherit({
    *   Called when the {credentials} have been properly set on the configuration
    *   object.
    *
-   *   @param err [Error] if this is set, credentials were not successfuly
+   *   @param err [Error] if this is set, credentials were not successfully
    *     loaded and this error provides information why.
    * @see credentials
    * @see Credentials
@@ -301,7 +317,9 @@ AWS.Config = AWS.util.inherit({
 
     function credError(msg, err) {
       return new AWS.util.error(err || new Error(), {
-        code: 'CredentialsError', message: msg
+        code: 'CredentialsError',
+        message: msg,
+        name: 'CredentialsError'
       });
     }
 
@@ -362,7 +380,7 @@ AWS.Config = AWS.util.inherit({
     allowUnknownKeys = allowUnknownKeys || false;
     options = this.extractCredentials(options);
     AWS.util.each.call(this, options, function (key, value) {
-      if (allowUnknownKeys || this.keys.hasOwnProperty(key) ||
+      if (allowUnknownKeys || Object.prototype.hasOwnProperty.call(this.keys, key) ||
           AWS.Service.hasService(key)) {
         this.set(key, value);
       }
@@ -457,6 +475,7 @@ AWS.Config = AWS.util.inherit({
     sslEnabled: true,
     s3ForcePathStyle: false,
     s3BucketEndpoint: false,
+    s3DisableBodySigning: true,
     computeChecksums: true,
     convertResponseTypes: true,
     correctClockSkew: false,
@@ -465,9 +484,7 @@ AWS.Config = AWS.util.inherit({
     systemClockOffset: 0,
     signatureVersion: null,
     signatureCache: true,
-    retryDelayOptions: {
-      base: 100
-    },
+    retryDelayOptions: {},
     useAccelerateEndpoint: false
   },
 
@@ -487,10 +504,26 @@ AWS.Config = AWS.util.inherit({
 
   /**
    * Sets the promise dependency the SDK will use wherever Promises are returned.
+   * Passing `null` will force the SDK to use native Promises if they are available.
+   * If native Promises are not available, passing `null` will have no effect.
    * @param [Constructor] dep A reference to a Promise constructor
    */
   setPromisesDependency: function setPromisesDependency(dep) {
-    AWS.util.addPromisesToRequests(AWS.Request, dep);
+    PromisesDependency = dep;
+    // if null was passed in, we should try to use native promises
+    if (dep === null && typeof Promise === 'function') {
+      PromisesDependency = Promise;
+    }
+    var constructors = [AWS.Request, AWS.Credentials, AWS.CredentialProviderChain];
+    if (AWS.S3 && AWS.S3.ManagedUpload) constructors.push(AWS.S3.ManagedUpload);
+    AWS.util.addPromises(constructors, PromisesDependency);
+  },
+
+  /**
+   * Gets the promise dependency set by `AWS.config.setPromisesDependency`.
+   */
+  getPromisesDependency: function getPromisesDependency() {
+    return PromisesDependency;
   }
 });
 

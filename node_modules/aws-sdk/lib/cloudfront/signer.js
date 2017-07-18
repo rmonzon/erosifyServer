@@ -1,6 +1,6 @@
-var crypto = require('crypto'),
-    url = require('url'),
-    AWS = require('../core'),
+var AWS = require('../core'),
+    url = AWS.util.url,
+    crypto = AWS.util.crypto.lib,
     base64Encode = AWS.util.base64.encode,
     inherit = AWS.util.inherit;
 
@@ -59,7 +59,7 @@ var determineScheme = function (url) {
 
 var getRtmpUrl = function (rtmpUrl) {
     var parsed = url.parse(rtmpUrl);
-    return parsed.path.replace(/^\//, '') + parsed.hash;
+    return parsed.path.replace(/^\//, '') + (parsed.hash || '');
 };
 
 var getResource = function (url) {
@@ -139,7 +139,7 @@ AWS.CloudFront.Signer = inherit({
 
         var cookieHash = {};
         for (var key in signatureHash) {
-            if (signatureHash.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(signatureHash, key)) {
                 cookieHash['CloudFront-' + key] = signatureHash[key];
             }
         }
@@ -180,13 +180,13 @@ AWS.CloudFront.Signer = inherit({
         }
 
         var parsedUrl = url.parse(options.url, true),
-            signatureHash = options.hasOwnProperty('policy')
+            signatureHash = Object.prototype.hasOwnProperty.call(options, 'policy')
                 ? signWithCustomPolicy(options.policy, this.keyPairId, this.privateKey)
                 : signWithCannedPolicy(resource, options.expires, this.keyPairId, this.privateKey);
 
         parsedUrl.search = null;
         for (var key in signatureHash) {
-            if (signatureHash.hasOwnProperty(key)) {
+            if (Object.prototype.hasOwnProperty.call(signatureHash, key)) {
                 parsedUrl.query[key] = signatureHash[key];
             }
         }

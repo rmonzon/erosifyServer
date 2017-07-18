@@ -22,6 +22,7 @@ coverage
 .lock-wscript
 
 .idea
+node_modules
 
 # Compiled binary addons (http://nodejs.org/api/addons.html)
 build/Release

@@ -65,7 +65,7 @@ AWS.ParamValidator = AWS.util.inherit({
 
     // validate hash members
     for (paramName in params) {
-      if (!params.hasOwnProperty(paramName)) continue;
+      if (!Object.prototype.hasOwnProperty.call(params, paramName)) continue;
 
       var paramValue = params[paramName],
           memberShape = shape.members[paramName];
@@ -110,7 +110,7 @@ AWS.ParamValidator = AWS.util.inherit({
       // Build up a count of map members to validate range traits.
       var mapCount = 0;
       for (var param in params) {
-        if (!params.hasOwnProperty(param)) continue;
+        if (!Object.prototype.hasOwnProperty.call(params, param)) continue;
         // Validate any map key trait constraints
         this.validateMember(shape.key, param,
                             context + '[key=\'' + param + '\']')
@@ -147,7 +147,11 @@ AWS.ParamValidator = AWS.util.inherit({
   },
 
   validateString: function validateString(shape, value, context) {
-    if (this.validateType(value, context, ['string'])) {
+    var validTypes = ['string'];
+    if (shape.isJsonValue) {
+      validTypes = validTypes.concat(['number', 'object', 'boolean']);
+    }
+    if (value !== null && this.validateType(value, context, validTypes)) {
       this.validateEnum(shape, value, context);
       this.validateRange(shape, value.length, context, 'string length');
       this.validatePattern(shape, value, context);
@@ -236,7 +240,7 @@ AWS.ParamValidator = AWS.util.inherit({
     if (typeof value === 'string') return;
     if (value && typeof value.byteLength === 'number') return; // typed arrays
     if (AWS.util.isNode()) { // special check for buffer/stream in Node.js
-      var Stream = AWS.util.nodeRequire('stream').Stream;
+      var Stream = AWS.util.stream.Stream;
       if (AWS.util.Buffer.isBuffer(value) || value instanceof Stream) return;
     }
 
