@@ -1,6 +1,6 @@
 {
   "name": "erosify-server",
-  "version": "0.1.3",
+  "version": "1.0.0",
   "description": "Erosify RESTful API server written in Node.js",
   "main": "index.js",
   "scripts": {
